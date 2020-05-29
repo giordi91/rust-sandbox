@@ -10,10 +10,6 @@ rust.then(m => {
         return;
     }
 
-    gl.enable(gl.BLEND);
-    gl.blendFunc(gl.SRC_ALPHA,gl.ONE_MINUS_SRC_ALPHA);
-
-
     const gameClient = new m.GameClient();
     const initialTime = Date.now();
 
@@ -38,13 +34,6 @@ rust.then(m => {
         let elapsedTime = currTime - initialTime;
         gameClient.update(elapsedTime, window.innerHeight,window.innerHeight);
         gameClient.render();
-
-
-        //Rust update call
-
-        //Rust render call
-
-
     }
 
     //kicking the loop
