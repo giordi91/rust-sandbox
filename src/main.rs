@@ -6,59 +6,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-/*
-fn run(event_loop: EventLoop<()>, window: Window)
-{
-    let mut state = State::new(&window);
-    //TODO this is a closure, investigate
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::RedrawRequested(_) => {
-            state.update();
-            state.render();
-        }
-        Event::MainEventsCleared => {
-            // RedrawRequested will only trigger once, unless we manually
-            // request it.
-            window.request_redraw();
-        }
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        }
-        //we first the event to the input and if is not handled ( meaning returning false)
-        //we go down to normal match statement
-        if window_id == window.id() => if !state.input(event) {
-        match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::KeyboardInput {
-                input,
-                ..
-            } => {
-                match input {
-                    KeyboardInput {
-                        state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    _ => {}
-                }
-            }
-            WindowEvent::Resized(physical_size) => {
-                state.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                // new_inner_size is &mut so w have to dereference it twice
-                state.resize(**new_inner_size);
-            }
-            _ => {}
-        }
-    }
-    _ => {}
-    });
 
-
-}
-*/
 struct State {
     instance: wgpu::Instance,
     surface: wgpu::Surface,
@@ -215,42 +163,11 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
                 // request it.
             }
             Event::RedrawEventsCleared => {
-                /*
-                let frame = state.swap_chain
-                    .get_next_frame()
-                    .expect("Failed to acquire next swap chain texture")
-                    .output;
-                //this is the command buffer we use to record commands
-                let mut encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-                {
-                    let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.view,
-                            resolve_target: None,
-                            load_op: wgpu::LoadOp::Clear,
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color {
-                                r: 0.1,
-                                g: 0.2,
-                                b: color,
-                                a: 1.0,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
-
-                }
-                color += 0.001;
-                if color > 1.0
-                {color = 0.0;}
-                state.queue.submit(Some(encoder.finish()));
-                */
+                state.update();
                 state.render();
             }
             _ => {
+                //debug log of the event being passed by the window and not handled
                 //println!("{:?}",event)
             }
         }
@@ -262,9 +179,54 @@ fn main() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
 
+#[cfg(not(target_arch = "wasm32"))]
+{
     //env_logger::init();
     // Temporarily avoid srgb formats for the swapchain on the web
+    // Since main can't be async, we're going to need to block
     futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8UnormSrgb));
 
-    // Since main can't be async, we're going to need to block
 }
+
+#[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("could not initialize logger");
+        use winit::platform::web::WindowExtWebSys;
+        // On wasm, append the canvas to the document body
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.body())
+            .and_then(|body| {
+                body.append_child(&web_sys::Element::from(window.canvas()))
+                    .ok()
+            })
+            .expect("couldn't append canvas to document body");
+        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+    }
+}
+
+/*
+#[cfg(not(target_arch = "wasm32"))]
+    {
+        env_logger::init();
+        // Temporarily avoid srgb formats for the swapchain on the web
+        futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8UnormSrgb));
+    }
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        console_log::init().expect("could not initialize logger");
+        use winit::platform::web::WindowExtWebSys;
+        // On wasm, append the canvas to the document body
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.body())
+            .and_then(|body| {
+                body.append_child(&web_sys::Element::from(window.canvas()))
+                    .ok()
+            })
+            .expect("couldn't append canvas to document body");
+        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+    }
+    */
