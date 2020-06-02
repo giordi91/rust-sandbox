@@ -19,6 +19,12 @@ To target wasm you will also need to add the wasm-bindgen-cli
 cargo install -f wasm-bindgen-cli
 ```
 
+Optional: you might have to fix a dependency of cc
+```
+cargo update -p cc --precise 1.0.50
+```
+
+
 wasmpack
 
 ```
