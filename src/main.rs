@@ -1,21 +1,15 @@
 use std::io::{self, Write};
 
-
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
 
-fn main() {
-    let event_loop = EventLoop::new();
-    let window = WindowBuilder::new().build(&event_loop).unwrap();
-
-    use futures::executor::block_on;
-
-    // Since main can't be async, we're going to need to block
-    let mut state = block_on(State::new(&window));
-
+/*
+fn run(event_loop: EventLoop<()>, window: Window)
+{
+    let mut state = State::new(&window);
     //TODO this is a closure, investigate
     event_loop.run(move |event, _, control_flow| match event {
         Event::RedrawRequested(_) => {
@@ -30,10 +24,10 @@ fn main() {
         Event::WindowEvent {
             ref event,
             window_id,
-        } 
-        //we first the event to the input and if is not handled ( meaning returning false) 
+        }
+        //we first the event to the input and if is not handled ( meaning returning false)
         //we go down to normal match statement
-        if window_id == window.id() => if !state.input(event) { 
+        if window_id == window.id() => if !state.input(event) {
         match event {
             WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
             WindowEvent::KeyboardInput {
@@ -57,13 +51,16 @@ fn main() {
                 state.resize(**new_inner_size);
             }
             _ => {}
-        } 
-    } 
+        }
+    }
     _ => {}
     });
-}
 
+
+}
+*/
 struct State {
+    instance: wgpu::Instance,
     surface: wgpu::Surface,
     adapter: wgpu::Adapter,
     device: wgpu::Device,
@@ -72,62 +69,52 @@ struct State {
     swap_chain: wgpu::SwapChain,
 
     size: winit::dpi::PhysicalSize<u32>,
-
-
+    color: f64
 }
-
 impl State {
     async fn new(window: &Window) -> Self {
         let size = window.inner_size();
 
-        //this is what we render to
-        let surface = wgpu::Surface::create(window);
-
-        //TODO iterate all the devices and find the requested one
-        let adapter = wgpu::Adapter::request(
-            &wgpu::RequestAdapterOptions {
-                power_preference: wgpu::PowerPreference::Default,
-                compatible_surface: Some(&surface),
-            },
-            wgpu::BackendBit::VULKAN,
-        )
-        .await
-        .unwrap();
+        let instance = wgpu::Instance::new();
+        let surface = unsafe { instance.create_surface(window) };
+        let adapter = instance
+            .request_adapter(
+                &wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::Default,
+                    compatible_surface: Some(&surface),
+                },
+                wgpu::BackendBit::PRIMARY,
+            )
+            .await
+            .unwrap();
 
         let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                extensions: wgpu::Extensions {
-                    anisotropic_filtering: false,
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    extensions: wgpu::Extensions {
+                        anisotropic_filtering: false,
+                    },
+                    limits: wgpu::Limits::default(),
                 },
-                limits: Default::default(),
-            })
-            .await;
+                None,
+            )
+            .await
+            .unwrap();
 
-        let adapter_info = adapter.get_info();
-        print!("found gpu: {:?}", adapter_info);
-        io::stdout().flush().unwrap();
-
-        //now that we have an adapter we can use it to create a logical device and associated queeu
-        let (device, queue) = adapter
-            .request_device(&wgpu::DeviceDescriptor {
-                extensions: wgpu::Extensions {
-                    anisotropic_filtering: false,
-                },
-                limits: Default::default(),
-            })
-            .await;
-        //let us create a swapchain
         let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: wgpu::TextureFormat::Bgra8UnormSrgb,
+            //TODO hardocded
+            format: wgpu::TextureFormat::Bgra8Unorm,
             width: size.width,
             height: size.height,
-            //TODO we might want to change this
-            present_mode: wgpu::PresentMode::Fifo,
+            present_mode: wgpu::PresentMode::Mailbox,
         };
+
         let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+        let color = 0.0;
 
         Self {
+            instance,
             surface,
             adapter,
             device: device,
@@ -135,6 +122,7 @@ impl State {
             sc_desc,
             swap_chain,
             size,
+            color,
         }
     }
 
@@ -155,37 +143,128 @@ impl State {
     }
 
     fn render(&mut self) {
-        //first we need to get the frame we can use from the swap chain so we can render to it 
-        let frame = self.swap_chain.get_next_texture()
-        .expect("Timeout getting texture");
+        //first we need to get the frame we can use from the swap chain so we can render to it
+        let frame = self
+            .swap_chain
+            .get_next_frame()
+            .expect("Failed to acquire next swap chain texture")
+            .output;
 
-        //this is the command buffer we use to record commands 
-        let mut encoder = self.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-            label: Some("Render Encoder"),
-        });
+        //this is the command buffer we use to record commands
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[
-                    wgpu::RenderPassColorAttachmentDescriptor {
-                        attachment: &frame.view,
-                        resolve_target: None,
-                        load_op: wgpu::LoadOp::Clear,
-                        store_op: wgpu::StoreOp::Store,
-                        clear_color: wgpu::Color {
-                            r: 0.1,
-                            g: 0.2,
-                            b: 0.3,
-                            a: 1.0,
-                        },
-                    }
-                ],
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: self.color,
+                        a: 1.0,
+                    },
+                }],
                 depth_stencil_attachment: None,
             });
         }
-    
-        self.queue.submit(&[
-            encoder.finish()
-        ]);
+       self. color += 0.001;
+        if self.color > 1.0 {
+            self.color = 0.0;
+        }
+        self.queue.submit(Some(encoder.finish()));
     }
+}
+
+pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
+    let size = window.inner_size();
+
+    let mut state = State::new(&window).await;
+
+    let mut color: f64 = 0.0;
+
+    event_loop.run(move |event, _, control_flow| {
+        // force ownership by the closure
+        let _ = (&state,);
+
+        *control_flow = ControlFlow::Poll;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::Resized(size),
+                ..
+            } => {
+                state.sc_desc.width = size.width;
+                state.sc_desc.height = size.height;
+                state.swap_chain = state
+                    .device
+                    .create_swap_chain(&state.surface, &state.sc_desc);
+            }
+            Event::RedrawRequested(_) => {}
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            } => *control_flow = ControlFlow::Exit,
+            Event::MainEventsCleared => {
+                // RedrawRequested will only trigger once, unless we manually
+                // request it.
+            }
+            Event::RedrawEventsCleared => {
+                /*
+                let frame = state.swap_chain
+                    .get_next_frame()
+                    .expect("Failed to acquire next swap chain texture")
+                    .output;
+                //this is the command buffer we use to record commands
+                let mut encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                    label: Some("Render Encoder"),
+                });
+
+                {
+                    let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                            attachment: &frame.view,
+                            resolve_target: None,
+                            load_op: wgpu::LoadOp::Clear,
+                            store_op: wgpu::StoreOp::Store,
+                            clear_color: wgpu::Color {
+                                r: 0.1,
+                                g: 0.2,
+                                b: color,
+                                a: 1.0,
+                            },
+                        }],
+                        depth_stencil_attachment: None,
+                    });
+
+                }
+                color += 0.001;
+                if color > 1.0
+                {color = 0.0;}
+                state.queue.submit(Some(encoder.finish()));
+                */
+                state.render();
+            }
+            _ => {
+                //println!("{:?}",event)
+            }
+        }
+    });
+}
+
+fn main() {
+    let event_loop = EventLoop::new();
+    let window = WindowBuilder::new().build(&event_loop).unwrap();
+    window.set_title("Rust Sandbox v0.0.1");
+
+    //env_logger::init();
+    // Temporarily avoid srgb formats for the swapchain on the web
+    futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8UnormSrgb));
+
+    // Since main can't be async, we're going to need to block
 }
