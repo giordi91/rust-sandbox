@@ -23,7 +23,9 @@ Optional: you might have to fix a dependency of cc
 ```
 cargo update -p cc --precise 1.0.50
 ```
-
+```
+rustup target add wasm32-unknown-unknown
+```
 
 wasmpack
 
