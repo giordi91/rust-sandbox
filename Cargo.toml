@@ -19,10 +19,6 @@ futures = "0.3.5"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 #needed for requiring platform web
 winit = { version = "0.22.1", features = ["web-sys"] }
-arrayvec = "0.5"
-smallvec = "1"
-raw-window-handle = "0.3"
-parking_lot = "0.10"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2.62"
@@ -115,7 +111,7 @@ web-sys = { version = "0.3.39", features = [
 ]}
 js-sys = "0.3.39"
 wasm-bindgen-futures = "0.4.12"
+console_error_panic_hook = "0.1.6"
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
-console_error_panic_hook = "0.1.6"
 console_log = "0.1.2"
