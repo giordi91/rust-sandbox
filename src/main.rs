@@ -28,12 +28,12 @@ impl State {
                     power_preference: wgpu::PowerPreference::Default,
                     compatible_surface: Some(&surface),
                 },
-                wgpu::BackendBit::VULKAN,
+                wgpu::BackendBit::PRIMARY,
             )
             .await
             .unwrap();
 
-        println!("{:?}",_adapter.get_info());
+        //println!("{:?}",_adapter.get_info());
 
         let (device, queue) = _adapter
             .request_device(
