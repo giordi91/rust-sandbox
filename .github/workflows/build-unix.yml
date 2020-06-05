@@ -19,7 +19,7 @@ jobs:
   build:
     strategy:
       matrix:
-        os: [ubuntu, macos]
+        os: [ubuntu, macos, windows]
     name: ${{matrix.os}}
     runs-on: ${{matrix.os}}-latest
     steps:
