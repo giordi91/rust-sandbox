@@ -33,7 +33,6 @@ impl State {
             .await
             .unwrap();
 
-        //println!("{:?}",_adapter.get_info());
 
         let (device, queue) = _adapter
             .request_device(
