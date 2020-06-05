@@ -1,6 +1,8 @@
 # rust-sandbox
 
-#compiling
+![Continuous integration](https://github.com/giordi91/rust-sandbox/workflows/Continuous%20integration/badge.svg)
+
+# compiling
 
 Install rust:
 ```
