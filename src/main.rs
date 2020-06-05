@@ -1,4 +1,3 @@
-
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
@@ -34,20 +33,18 @@ impl State {
             .await
             .unwrap();
 
+        println!("{:?}",_adapter.get_info());
+
         let (device, queue) = _adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    extensions: wgpu::Extensions {
-                        anisotropic_filtering: false,
-                    },
+                    extensions: wgpu::Extensions::empty(),
                     limits: wgpu::Limits::default(),
                 },
                 None,
             )
             .await
             .unwrap();
-        
-
 
         let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
@@ -130,7 +127,6 @@ impl State {
 }
 
 pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
-
     let mut state = State::new(&window, swapchain_format).await;
 
     event_loop.run(move |event, _, control_flow| {
@@ -138,36 +134,33 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
         let _ = (&state,);
 
         *control_flow = ControlFlow::Poll;
-        //This match statement is still slightly confusing for me, need to investigate a 
+        //This match statement is still slightly confusing for me, need to investigate a
         //bit more
         match event {
             Event::WindowEvent {
                 ref event,
                 window_id,
-            } if window_id == window.id() => if !state.input(event) {
-                match event {
-                    WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-                    WindowEvent::KeyboardInput {
-                        input,
-                        ..
-                    } => {
-                        match input {
+            } if window_id == window.id() => {
+                if !state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        WindowEvent::KeyboardInput { input, .. } => match input {
                             KeyboardInput {
                                 state: ElementState::Pressed,
                                 virtual_keycode: Some(VirtualKeyCode::Escape),
                                 ..
                             } => *control_flow = ControlFlow::Exit,
-                            _ => {println!("unhandled input {:?}",input)}
+                            _ => println!("unhandled input {:?}", input),
+                        },
+                        WindowEvent::Resized(physical_size) => {
+                            state.resize(*physical_size);
                         }
+                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                            // new_inner_size is &mut so w have to dereference it twice
+                            state.resize(**new_inner_size);
+                        }
+                        _ => {}
                     }
-                    WindowEvent::Resized(physical_size) => {
-                        state.resize(*physical_size);
-                    }
-                    WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                        // new_inner_size is &mut so w have to dereference it twice
-                        state.resize(**new_inner_size);
-                    }
-                    _ => {}
                 }
             }
             Event::RedrawRequested(_) => {
