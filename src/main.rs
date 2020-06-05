@@ -1,83 +1,28 @@
-use std::io::{self, Write};
-
 use winit::{
     event::*,
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
 
-/*
-fn run(event_loop: EventLoop<()>, window: Window)
-{
-    let mut state = State::new(&window);
-    //TODO this is a closure, investigate
-    event_loop.run(move |event, _, control_flow| match event {
-        Event::RedrawRequested(_) => {
-            state.update();
-            state.render();
-        }
-        Event::MainEventsCleared => {
-            // RedrawRequested will only trigger once, unless we manually
-            // request it.
-            window.request_redraw();
-        }
-        Event::WindowEvent {
-            ref event,
-            window_id,
-        }
-        //we first the event to the input and if is not handled ( meaning returning false)
-        //we go down to normal match statement
-        if window_id == window.id() => if !state.input(event) {
-        match event {
-            WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
-            WindowEvent::KeyboardInput {
-                input,
-                ..
-            } => {
-                match input {
-                    KeyboardInput {
-                        state: ElementState::Pressed,
-                        virtual_keycode: Some(VirtualKeyCode::Escape),
-                        ..
-                    } => *control_flow = ControlFlow::Exit,
-                    _ => {}
-                }
-            }
-            WindowEvent::Resized(physical_size) => {
-                state.resize(*physical_size);
-            }
-            WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
-                // new_inner_size is &mut so w have to dereference it twice
-                state.resize(**new_inner_size);
-            }
-            _ => {}
-        }
-    }
-    _ => {}
-    });
-
-
-}
-*/
 struct State {
-    instance: wgpu::Instance,
+    _instance: wgpu::Instance,
     surface: wgpu::Surface,
-    adapter: wgpu::Adapter,
+    _adapter: wgpu::Adapter,
     device: wgpu::Device,
     queue: wgpu::Queue,
     sc_desc: wgpu::SwapChainDescriptor,
     swap_chain: wgpu::SwapChain,
 
     size: winit::dpi::PhysicalSize<u32>,
-    color: f64
+    color: f64,
 }
 impl State {
-    async fn new(window: &Window) -> Self {
+    async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
         let size = window.inner_size();
 
-        let instance = wgpu::Instance::new();
-        let surface = unsafe { instance.create_surface(window) };
-        let adapter = instance
+        let _instance = wgpu::Instance::new();
+        let surface = unsafe { _instance.create_surface(window) };
+        let _adapter = _instance
             .request_adapter(
                 &wgpu::RequestAdapterOptions {
                     power_preference: wgpu::PowerPreference::Default,
@@ -88,7 +33,9 @@ impl State {
             .await
             .unwrap();
 
-        let (device, queue) = adapter
+        //println!("{:?}",_adapter.get_info());
+
+        let (device, queue) = _adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
                     extensions: wgpu::Extensions::empty(),
@@ -101,8 +48,7 @@ impl State {
 
         let sc_desc = wgpu::SwapChainDescriptor {
             usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            //TODO hardocded
-            format: wgpu::TextureFormat::Bgra8Unorm,
+            format: swapchain_format,
             width: size.width,
             height: size.height,
             present_mode: wgpu::PresentMode::Mailbox,
@@ -112,9 +58,9 @@ impl State {
         let color = 0.0;
 
         Self {
-            instance,
+            _instance,
             surface,
-            adapter,
+            _adapter,
             device: device,
             queue: queue,
             sc_desc,
@@ -132,7 +78,7 @@ impl State {
     }
 
     // input() won't deal with GPU code, so it can be synchronous
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, _event: &WindowEvent) -> bool {
         false
     }
 
@@ -172,7 +118,7 @@ impl State {
                 depth_stencil_attachment: None,
             });
         }
-       self. color += 0.001;
+        self.color += 0.001;
         if self.color > 1.0 {
             self.color = 0.0;
         }
@@ -181,76 +127,52 @@ impl State {
 }
 
 pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
-    let size = window.inner_size();
-
-    let mut state = State::new(&window).await;
-
-    let mut color: f64 = 0.0;
+    let mut state = State::new(&window, swapchain_format).await;
 
     event_loop.run(move |event, _, control_flow| {
         // force ownership by the closure
         let _ = (&state,);
 
         *control_flow = ControlFlow::Poll;
+        //This match statement is still slightly confusing for me, need to investigate a
+        //bit more
         match event {
             Event::WindowEvent {
-                event: WindowEvent::Resized(size),
-                ..
-            } => {
-                state.sc_desc.width = size.width;
-                state.sc_desc.height = size.height;
-                state.swap_chain = state
-                    .device
-                    .create_swap_chain(&state.surface, &state.sc_desc);
+                ref event,
+                window_id,
+            } if window_id == window.id() => {
+                if !state.input(event) {
+                    match event {
+                        WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
+                        WindowEvent::KeyboardInput { input, .. } => match input {
+                            KeyboardInput {
+                                state: ElementState::Pressed,
+                                virtual_keycode: Some(VirtualKeyCode::Escape),
+                                ..
+                            } => *control_flow = ControlFlow::Exit,
+                            _ => println!("unhandled input {:?}", input),
+                        },
+                        WindowEvent::Resized(physical_size) => {
+                            state.resize(*physical_size);
+                        }
+                        WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
+                            // new_inner_size is &mut so w have to dereference it twice
+                            state.resize(**new_inner_size);
+                        }
+                        _ => {}
+                    }
+                }
             }
-            Event::RedrawRequested(_) => {}
-            Event::WindowEvent {
-                event: WindowEvent::CloseRequested,
-                ..
-            } => *control_flow = ControlFlow::Exit,
+            Event::RedrawRequested(_) => {
+                state.update();
+                state.render();
+            }
             Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually
                 // request it.
+                window.request_redraw();
             }
-            Event::RedrawEventsCleared => {
-                /*
-                let frame = state.swap_chain
-                    .get_next_frame()
-                    .expect("Failed to acquire next swap chain texture")
-                    .output;
-                //this is the command buffer we use to record commands
-                let mut encoder = state.device.create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
-
-                {
-                    let _render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                        color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                            attachment: &frame.view,
-                            resolve_target: None,
-                            load_op: wgpu::LoadOp::Clear,
-                            store_op: wgpu::StoreOp::Store,
-                            clear_color: wgpu::Color {
-                                r: 0.1,
-                                g: 0.2,
-                                b: color,
-                                a: 1.0,
-                            },
-                        }],
-                        depth_stencil_attachment: None,
-                    });
-
-                }
-                color += 0.001;
-                if color > 1.0
-                {color = 0.0;}
-                state.queue.submit(Some(encoder.finish()));
-                */
-                state.render();
-            }
-            _ => {
-                //println!("{:?}",event)
-            }
+            _ => {}
         }
     });
 }
@@ -260,9 +182,28 @@ fn main() {
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
 
-    //env_logger::init();
-    // Temporarily avoid srgb formats for the swapchain on the web
-    futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8UnormSrgb));
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        //env_logger::init();
+        // Temporarily avoid srgb formats for the swapchain on the web
+        // Since main can't be async, we're going to need to block
+        futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+    }
 
-    // Since main can't be async, we're going to need to block
+    #[cfg(target_arch = "wasm32")]
+    {
+        std::panic::set_hook(Box::new(console_error_panic_hook::hook));
+        //console_log::init().expect("could not initialize logger");
+        use winit::platform::web::WindowExtWebSys;
+        // On wasm, append the canvas to the document body
+        web_sys::window()
+            .and_then(|win| win.document())
+            .and_then(|doc| doc.body())
+            .and_then(|body| {
+                body.append_child(&web_sys::Element::from(window.canvas()))
+                    .ok()
+            })
+            .expect("couldn't append canvas to document body");
+        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+    }
 }
