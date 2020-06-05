@@ -21,7 +21,7 @@ jobs:
       matrix:
         os: [ubuntu, macos]
     name: ${{matrix.os}}
-    runs-on: ${{matrix.os}}-latest§ 
+    runs-on: ${{matrix.os}}-latest
     steps:
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
