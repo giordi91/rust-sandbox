@@ -17,7 +17,7 @@ jobs:
         with:
           command: check
   build:
-    name: Test Suite
+    name: Build 
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v2

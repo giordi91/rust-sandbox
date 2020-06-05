@@ -60,8 +60,8 @@ impl State {
             _instance,
             surface,
             _adapter,
-            device: device,
-            queue: queue,
+            device,
+            queue,
             sc_desc,
             swap_chain,
             size,
@@ -175,6 +175,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
         }
     });
 }
+
 
 fn main() {
     let event_loop = EventLoop::new();
