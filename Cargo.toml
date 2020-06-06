@@ -17,6 +17,7 @@ wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 #needed for requiring platform web
 winit = { version = "0.22.1", features = ["web-sys"] }
 shaderc = "0.6"
+bytemuck = "1.2.0"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2.62"
