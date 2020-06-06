@@ -1,0 +1,30 @@
+[tasks.build]
+command = "cargo"
+args = ["build"]
+
+[tasks.pre-build]
+script_runner = "@shell"
+script = [
+ '''
+ #not sure how to get the current target so I have to create all possibles
+ mkdir target/debug 
+ mkdir target/release
+ mkdir target/generated
+
+#this is done otherwise windows command asks confirmation to override
+#so removing exisiting resource directory if exits
+ rm -rf target/debug/resources
+ rm -rf target/release/resources
+ rm -rf target/generated/resources
+
+#copy over the data
+ cp -r resources  target/debug/resources/
+ cp -r resources  target/release/resources/
+ cp -r resources  target/generated/resources/
+ '''
+]
+
+
+
+[tasks.full-build]
+dependencies = ["pre-build", "build"]
