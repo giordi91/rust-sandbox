@@ -149,9 +149,9 @@ impl State {
             label: Some("uniform_bind_group"),
         });
 
-        let vs_src= engine::shader::load_shader("src/shader.vert");
+        let vs_src= engine::shader::load_shader("resources/shader.vert");
         //let vs_src = include_str!("shader.vert");
-        let fs_src = include_str!("shader.frag");
+        let fs_src = engine::shader::load_shader("resources/shader.frag");
 
         let mut compiler = shaderc::Compiler::new().unwrap();
         let vs_spirv = compiler
@@ -165,7 +165,7 @@ impl State {
             .unwrap();
         let fs_spirv = compiler
             .compile_into_spirv(
-                fs_src,
+                &fs_src[..],
                 shaderc::ShaderKind::Fragment,
                 "shader.frag",
                 "main",
