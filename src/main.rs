@@ -3,6 +3,9 @@ use winit::{
     event_loop::{ControlFlow, EventLoop},
     window::{Window, WindowBuilder},
 };
+
+use rust_sandbox::engine;
+
 #[cfg_attr(rustfmt, rustfmt_skip)]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -146,13 +149,14 @@ impl State {
             label: Some("uniform_bind_group"),
         });
 
-        let vs_src = include_str!("shader.vert");
+        let vs_src= engine::shader::load_shader("src/shader.vert");
+        //let vs_src = include_str!("shader.vert");
         let fs_src = include_str!("shader.frag");
 
         let mut compiler = shaderc::Compiler::new().unwrap();
         let vs_spirv = compiler
             .compile_into_spirv(
-                vs_src,
+                &vs_src[..],
                 shaderc::ShaderKind::Vertex,
                 "shader.vert",
                 "main",
