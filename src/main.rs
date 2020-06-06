@@ -4,7 +4,7 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use rust_sandbox::engine;
+use rust_sandbox::engine::shader;
 
 #[cfg_attr(rustfmt, rustfmt_skip)]
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -81,7 +81,7 @@ impl State {
                     power_preference: wgpu::PowerPreference::Default,
                     compatible_surface: Some(&surface),
                 },
-                wgpu::BackendBit::VULKAN,
+                wgpu::BackendBit::PRIMARY,
             )
             .await
             .unwrap();
@@ -149,9 +149,8 @@ impl State {
             label: Some("uniform_bind_group"),
         });
 
-        let vs_src= engine::shader::load_shader("resources/shader.vert");
-        //let vs_src = include_str!("shader.vert");
-        let fs_src = engine::shader::load_shader("resources/shader.frag");
+        let vs_src= shader::load_shader_type("resources/shader", shader::ShaderType::VERTEX);
+        let fs_src = shader::load_shader_type("resources/shader", shader::ShaderType::FRAGMENT);
 
         let mut compiler = shaderc::Compiler::new().unwrap();
         let vs_spirv = compiler

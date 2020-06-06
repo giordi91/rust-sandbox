@@ -7,9 +7,9 @@ script_runner = "@shell"
 script = [
  '''
  #not sure how to get the current target so I have to create all possibles
- mkdir target/debug 
- mkdir target/release
- mkdir target/generated
+ mkdir -p target/debug 
+ mkdir -p target/release
+ mkdir -p target/generated
 
 #this is done otherwise windows command asks confirmation to override
 #so removing exisiting resource directory if exits
@@ -23,7 +23,6 @@ script = [
  cp -r resources  target/generated/resources/
  '''
 ]
-
 
 
 [tasks.full-build]

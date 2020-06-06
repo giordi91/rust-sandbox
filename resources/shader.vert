@@ -7,7 +7,6 @@ const vec2 positions[3] = vec2[3](
     vec2(0.5, -0.5)
 );
 
-// NEW!
 layout(set=0, binding=0)
 uniform Uniforms {
     mat4 u_view_proj; 
