@@ -26,7 +26,6 @@ impl ResourceHandle {
     }
 
     pub fn get_type(&self) -> ResourceHandleType {
-        let m = HANDLE_TYPE_MASK_FLAG >> (64 - HANDLE_TYPE_BIT_COUNT);
         let handle_type_bits = (self.data & HANDLE_TYPE_MASK_FLAG )>> (64 - HANDLE_TYPE_BIT_COUNT);
         let handle_type_u8 = handle_type_bits as u8;
         let handle_type: ResourceHandleType = unsafe { std::mem::transmute(handle_type_u8) };

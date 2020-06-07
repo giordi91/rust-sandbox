@@ -41,11 +41,6 @@ mod tests {
         assert_eq!(test_handle_invalid.get_value() , 3243);
     }
 
-
-
-
-
-
 }
 
 

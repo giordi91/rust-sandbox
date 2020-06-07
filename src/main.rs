@@ -326,8 +326,82 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
         }
     });
 }
+#[cfg(target_arch = "wasm32")]
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
+
+use std::fs;
+
+#[cfg(not(target_arch = "wasm32"))]
+pub fn load_file(path: &str) -> String  {
+    fs::read_to_string(&path).expect("")
+}
+
+
+
+use serde::{Deserialize, Serialize};
+use wasm_bindgen::prelude::*;
+use wasm_bindgen::JsCast;
+use wasm_bindgen_futures::JsFuture;
+use web_sys::{Request, RequestInit, RequestMode, Response};
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Branch {
+    pub name: String,
+    pub commit: Commit,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Commit {
+    pub sha: String,
+    pub commit: CommitDetails,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct CommitDetails {
+    pub author: Signature,
+    pub committer: Signature,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct Signature {
+    pub name: String,
+    pub email: String,
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn runn(url : &String) -> Result<JsValue, JsValue> {
+    let mut opts = RequestInit::new();
+    opts.method("GET");
+    opts.mode(RequestMode::Cors);
+
+    let request = Request::new_with_str_and_init(&url, &opts)?;
+
+    let window = web_sys::window().unwrap();
+    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
+
+    // `resp_value` is a `Response` object.
+    assert!(resp_value.is_instance_of::<Response>());
+    let resp: Response = resp_value.dyn_into().unwrap();
+
+    // Convert this other `Promise` into a rust `Future`.
+    let text = JsFuture::from(resp.text()?).await?.as_string().unwrap();
+    Ok(JsValue::from_serde(&text).unwrap())
+}
+
+#[cfg(target_arch = "wasm32")]
+pub async fn run_wrap()
+{
+    let url = String::from("resources/readme.txt");
+    let my_str = runn(&url).await.unwrap().as_string().unwrap();
+    log!("content of file {} is --> {}",&url, my_str);
+}
 
 fn main() {
+    /*
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
@@ -356,4 +430,16 @@ fn main() {
             .expect("couldn't append canvas to document body");
         wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
+    */
+    #[cfg(not(target_arch = "wasm32"))]
+    { println!("{}", load_file("resources/readme.txt"))
+    }
+
+    #[cfg(target_arch = "wasm32")]
+    {
+        wasm_bindgen_futures::spawn_local(run_wrap());
+        //log!("{}",);
+    }
+
 }
+//set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm

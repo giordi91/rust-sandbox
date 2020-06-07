@@ -9,19 +9,22 @@ edition = "2018"
 
 
 [dependencies]
-image = "0.22"
+image = "0.23.4"
 cgmath = "0.17"
 futures = "0.3.5"
 #wgpu = "0.5.0"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs" }
 #needed for requiring platform web
-winit = { version = "0.22.1", features = ["web-sys"] }
-shaderc = "0.6"
+winit = { version = "0.22.2", features = ["web-sys"] }
+rand = { version = "0.7.3", features = ["wasm-bindgen"] }
 bytemuck = "1.2.0"
+
+#[target.'cfg(not(target_arch = "wasm32"))'.dependencies]
+#shaderc = "0.6"
 
 [target.'cfg(target_arch = "wasm32")'.dependencies]
 wasm-bindgen = "0.2.62"
-web-sys = { version = "0.3.39", features = [
+web-sys = { version = "0.3.40", features = [
     "Document",
     "Navigator",
     "Node",
@@ -107,10 +110,19 @@ web-sys = { version = "0.3.39", features = [
     "GpuVertexAttributeDescriptor",
     "HtmlCanvasElement",
     "Window",
+    'Headers',
+  'Request',
+  'RequestInit',
+  'RequestMode',
+  'Response',
 ]}
 js-sys = "0.3.39"
 wasm-bindgen-futures = "0.4.12"
 console_error_panic_hook = "0.1.6"
+serde = { version = "1.0.80", features = ["derive"] }
+serde_derive = "^1.0.59"
+reqwest = { version = "0.10", features = ["json"] }
+
 
 [target.'cfg(target_arch = "wasm32")'.dev-dependencies]
 console_log = "0.1.2"
