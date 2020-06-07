@@ -150,7 +150,7 @@ impl State{
             label: Some("uniform_bind_group"),
         });
 
-        let shader_manager = shader::ShaderManager::new();
+        let mut shader_manager = shader::ShaderManager::new();
         let vs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
         let fs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
 

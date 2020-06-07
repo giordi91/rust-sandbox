@@ -14,17 +14,20 @@ pub struct Shader {
 
 pub struct ShaderManager {
     shader_mapper: HashMap<u32, Shader>,
+    compiler: shaderc::Compiler,
 }
 
 impl ShaderManager {
     pub fn new() -> Self {
         let shader_mapper: HashMap<u32, Shader> = HashMap::new();
+        let compiler = shaderc::Compiler::new().unwrap();
         Self {
             shader_mapper,
+            compiler,
         }
     }
     pub fn load_shader_type(
-        &self,
+        & mut self,
         device: &wgpu::Device,
         shader_name: &str,
         shader_type: ShaderType,
@@ -42,16 +45,13 @@ impl ShaderManager {
         let spv = format!("{}{}", &shader_file[..], SPIRV_EXT);
         let spv_exists = file_exists(&spv);
         let file_name = if spv_exists { spv } else { shader_file };
-        let binary_data: Vec<u32>; //=
+        let binary_data: Vec<u32>;
 
-        println!("spv file {}", &file_name[..]);
-        println!("spv found {}", spv_exists);
         if !spv_exists {
             let contents = fs::read_to_string(&file_name)
                 .expect("Something went wrong reading the shader source file");
             //generating the spv, does not work on browser context
-            let mut compiler = shaderc::Compiler::new().unwrap();
-            let spv_code = compiler
+            let spv_code = self.compiler
                 .compile_into_spirv(
                     &contents[..],
                     get_wgpu_shader_kind(&shader_type),
