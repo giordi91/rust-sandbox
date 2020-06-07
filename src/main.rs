@@ -342,35 +342,16 @@ pub fn load_file(path: &str) -> String  {
 
 
 
+#[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::prelude::*;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen::JsCast;
+#[cfg(target_arch = "wasm32")]
 use wasm_bindgen_futures::JsFuture;
+#[cfg(target_arch = "wasm32")]
 use web_sys::{Request, RequestInit, RequestMode, Response};
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Branch {
-    pub name: String,
-    pub commit: Commit,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Commit {
-    pub sha: String,
-    pub commit: CommitDetails,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct CommitDetails {
-    pub author: Signature,
-    pub committer: Signature,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-pub struct Signature {
-    pub name: String,
-    pub email: String,
-}
 
 #[cfg(target_arch = "wasm32")]
 pub async fn runn(url : &String) -> Result<JsValue, JsValue> {
