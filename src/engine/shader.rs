@@ -7,39 +7,7 @@ pub enum ShaderType {
     FRAGMENT,
 }
 
-#[repr(u8)]
-pub enum ResourceHandleType {
-    SHADER = 1,
-}
-
-const HANDLE_TYPE_BIT_COUNT: u64 = 10;
-//common trick, to generate a mask. If you wanna set the low n bits of an int,
-//you shift by N and subtract one, subtracting one will flipp all the N bits to 1
-const HANDLE_TYPE_MASK_BIT_RANGE: u64 = (1 << HANDLE_TYPE_BIT_COUNT) - 1;
-const HANDLE_TYPE_MASK_FLAG: u64 = HANDLE_TYPE_MASK_BIT_RANGE << (64 - HANDLE_TYPE_BIT_COUNT);
-
-pub struct ResourceHandle {
-    data: u64,
-}
-
-impl ResourceHandle {
-    pub fn new(handle_type: ResourceHandleType, value: u64) -> Self {
-        let handle_bits = (handle_type as u64) << (64 - HANDLE_TYPE_BIT_COUNT);
-        Self {
-            data: (handle_bits | value),
-        }
-    }
-
-    pub fn get_type(&self) -> ResourceHandleType {
-        let handle_type_bits = self.data & HANDLE_TYPE_MASK_FLAG >> (64 - HANDLE_TYPE_BIT_COUNT);
-        let handle_type_u8 = handle_type_bits as u8;
-        let handle_type: ResourceHandleType = unsafe { std::mem::transmute(handle_type_u8) };
-        handle_type
-    }
-    pub fn get_value(&self) -> u64{
-        self.data & (!HANDLE_TYPE_MASK_FLAG)
-    }
-}
+use super::handle;
 
 pub struct Shader {
     pub shader_type: ShaderType,
@@ -67,7 +35,7 @@ impl ShaderManager {
         device: &wgpu::Device,
         shader_name: &str,
         shader_type: ShaderType,
-    ) -> ResourceHandle {
+    ) -> handle::ResourceHandle {
         //first we want to check of an spir-v variant exists, that will save us
         //time at runtime (also compiling won't work in browser anyway)
 
@@ -113,11 +81,11 @@ impl ShaderManager {
         self.shader_counter += 1;
         self.shader_mapper.insert(self.shader_counter, shader);
 
-        ResourceHandle::new(ResourceHandleType::SHADER,self.shader_counter)
+        handle::ResourceHandle::new(handle::ResourceHandleType::SHADER,self.shader_counter)
     }
 
     //TODO investigate should pass the hande by value? will it get trivially copied?
-    pub fn get_shader_module(&self, handle: &ResourceHandle) ->Result<&wgpu::ShaderModule, &'static str>
+    pub fn get_shader_module(&self, handle: &handle::ResourceHandle) ->Result<&wgpu::ShaderModule, &'static str>
     {
         //assert is the correct type 
 

@@ -6,7 +6,7 @@ use winit::{
 
 use rust_sandbox::engine::shader;
 
-#[cfg_attr(rustfmt, rustfmt_skip)]
+#[cfg_attr(rustfmt, rustfmt_skip)] //just to avoid the matrix being formatted
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
     0.0, 1.0, 0.0, 0.0,
