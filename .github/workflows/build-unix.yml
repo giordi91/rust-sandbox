@@ -7,7 +7,7 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - run: choco install ninja  
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -22,13 +22,14 @@ jobs:
       matrix:
         os: [ubuntu, macos, windows]
     name: ${{matrix.os}}
-    runs-on: ${{matrix.os}}-latest
+    runs-on: ${{matrix.os}}-latest      
+  
     steps:
       - uses: actions/setup-python@v2
         with:
           python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
           architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
-      - uses: seanmiddleditch/gha-setup-ninja@master  
+      - run: choco install ninja  
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -38,6 +39,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: build 
+          
 
   test:
     name: Test Suite
@@ -57,7 +59,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: seanmiddleditch/gha-setup-ninja@master
+      - run: choco install ninja  
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
