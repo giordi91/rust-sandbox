@@ -54,7 +54,7 @@ impl Uniforms {
 unsafe impl bytemuck::Pod for Uniforms {}
 unsafe impl bytemuck::Zeroable for Uniforms {}
 
-struct State {
+struct State{
     _instance: wgpu::Instance,
     surface: wgpu::Surface,
     _adapter: wgpu::Adapter,
@@ -68,8 +68,9 @@ struct State {
     uniform_bind_group: wgpu::BindGroup,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
+    shader_manager: shader::ShaderManager
 }
-impl State {
+impl State{
     async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
         let size = window.inner_size();
 
@@ -149,49 +150,26 @@ impl State {
             label: Some("uniform_bind_group"),
         });
 
-        let vs_src= shader::load_shader_type("resources/shader", shader::ShaderType::VERTEX);
-        let fs_src = shader::load_shader_type("resources/shader", shader::ShaderType::FRAGMENT);
+        let shader_manager = shader::ShaderManager::new();
+        let vs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
+        let fs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
 
-        let mut compiler = shaderc::Compiler::new().unwrap();
-        let vs_spirv = compiler
-            .compile_into_spirv(
-                &vs_src[..],
-                shaderc::ShaderKind::Vertex,
-                "shader.vert",
-                "main",
-                None,
-            )
-            .unwrap();
-        let fs_spirv = compiler
-            .compile_into_spirv(
-                &fs_src[..],
-                shaderc::ShaderKind::Fragment,
-                "shader.frag",
-                "main",
-                None,
-            )
-            .unwrap();
-
-        let vs_data = wgpu::read_spirv(std::io::Cursor::new(vs_spirv.as_binary_u8())).unwrap();
-        let fs_data = wgpu::read_spirv(std::io::Cursor::new(fs_spirv.as_binary_u8())).unwrap();
-
-        let vs_module = device.create_shader_module(&vs_data);
-        let fs_module = device.create_shader_module(&fs_data);
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 bind_group_layouts: &[&uniform_bind_group_layout],
             });
+            
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &render_pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: &vs_module,
+                module: &vs_module.module,
                 entry_point: "main",
             },
             //frag is optional so we wrap it into an optioal
             fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &fs_module,
+                module: &fs_module.module,
                 entry_point: "main",
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
@@ -232,6 +210,7 @@ impl State {
             uniform_bind_group,
             size,
             color,
+            shader_manager
         }
     }
 

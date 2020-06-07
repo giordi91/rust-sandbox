@@ -1,4 +1,3 @@
-
 #[cfg(test)]
 mod tests {
     async fn get_adapter_info() {
@@ -13,9 +12,7 @@ mod tests {
             )
             .await
             .unwrap();
-        println!("{:?}", _adapter.get_info() );
-
-
+        println!("{:?}", _adapter.get_info());
     }
     #[test]
     #[should_panic]
