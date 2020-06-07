@@ -151,8 +151,10 @@ impl State{
         });
 
         let mut shader_manager = shader::ShaderManager::new();
-        let vs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
-        let fs_module = shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
+        let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
+        let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
+        let vs_module = shader_manager.get_shader_module(&vs_handle);
+        let fs_module = shader_manager.get_shader_module(&fs_handle);
 
 
         let render_pipeline_layout =
@@ -164,12 +166,12 @@ impl State{
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &render_pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: &vs_module.module,
+                module: (vs_module.unwrap()),
                 entry_point: "main",
             },
             //frag is optional so we wrap it into an optioal
             fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: &fs_module.module,
+                module: (fs_module.unwrap()),
                 entry_point: "main",
             }),
             rasterization_state: Some(wgpu::RasterizationStateDescriptor {
@@ -213,6 +215,7 @@ impl State{
             shader_manager
         }
     }
+
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.size = new_size;
@@ -279,8 +282,6 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
     let mut state = State::new(&window, swapchain_format).await;
 
     event_loop.run(move |event, _, control_flow| {
-        // force ownership by the closure
-        let _ = (&state,);
 
         *control_flow = ControlFlow::Poll;
         //This match statement is still slightly confusing for me, need to investigate a
