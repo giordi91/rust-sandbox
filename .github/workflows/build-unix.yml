@@ -7,7 +7,7 @@ jobs:
     name: Check
     runs-on: ubuntu-latest
     steps:
-      - run: choco install ninja  
+      - uses: seanmiddleditch/gha-setup-ninja@v1
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -29,10 +29,7 @@ jobs:
         with:
           python-version: '3.x' # Version range or exact version of a Python version to use, using SemVer's version range syntax
           architecture: 'x64' # optional x64 or x86. Defaults to x64 if not specified
-      - uses: crazy-max/ghaction-chocolatey@v1.2.2
-        with:
-          args: -h
-      - run: choco install ninja
+      - uses: seanmiddleditch/gha-setup-ninja@v1
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -48,8 +45,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-latest
     steps:
-      - uses: crazy-max/ghaction-chocolatey@v1.2.2
-      - run: choco install ninja
+      - uses: seanmiddleditch/gha-setup-ninja@v1
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
@@ -63,8 +59,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-latest
     steps:
-      - uses: crazy-max/ghaction-chocolatey@v1.2.2
-      - run: choco install ninja  
+      - uses: seanmiddleditch/gha-setup-ninja@v1
       - uses: actions/checkout@v2
       - uses: actions-rs/toolchain@v1
         with:
