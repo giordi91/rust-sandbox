@@ -90,7 +90,9 @@ impl State{
         let (device, queue) = _adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    extensions: wgpu::Extensions::empty(),
+                    extensions: wgpu::Extensions{
+                        anisotropic_filtering: true,
+                    },
                     limits: wgpu::Limits::default(),
                 },
                 None,
@@ -126,6 +128,15 @@ impl State{
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
 
+        /*
+        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
+            label: None,
+            size: 64,
+            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        });
+
+        queue.write_buffer(&uniform_buffer,0,bytemuck::cast_slice(&[uniforms]));
+        */
         let uniform_buffer = device.create_buffer_with_data(
             bytemuck::cast_slice(&[uniforms]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
@@ -141,20 +152,52 @@ impl State{
                 label: Some("uniform_bind_group_layout"),
             });
 
+            /*
         let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
                 resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
             }],
+
+
+            label: Some("uniform_bind_group"),
+        });
+        */
+        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+            layout: &uniform_bind_group_layout,
+            bindings: &[
+                wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buffer,
+                        // FYI: you can share a single buffer between bindings.
+                        range: 0..std::mem::size_of_val(&uniforms) as wgpu::BufferAddress,
+                    }
+                }
+            ],
             label: Some("uniform_bind_group"),
         });
 
+
+        let mut vs_module :Result<&wgpu::ShaderModule,&str>;
+        let mut fs_module :Result<&wgpu::ShaderModule,&str>;
         let mut shader_manager = shader::ShaderManager::new();
-        let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
-        let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
-        let vs_module = shader_manager.get_shader_module(&vs_handle);
-        let fs_module = shader_manager.get_shader_module(&fs_handle);
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
+            let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
+            vs_module = shader_manager.get_shader_module(&vs_handle);
+            fs_module = shader_manager.get_shader_module(&fs_handle);
+        }
+
+        #[cfg(target_arch = "wasm32")]
+        {
+            let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX).await;
+            let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT).await;
+            vs_module = shader_manager.get_shader_module(&vs_handle);
+            fs_module = shader_manager.get_shader_module(&fs_handle);
+        }
 
 
         let render_pipeline_layout =
@@ -235,11 +278,8 @@ impl State{
 
     fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
-        let frame = self
-            .swap_chain
-            .get_next_frame()
-            .expect("Failed to acquire next swap chain texture")
-            .output;
+        let frame = self.swap_chain.get_next_texture()
+        .expect("Timeout getting texture");
 
         //this is the command buffer we use to record commands
         let mut encoder = self
@@ -274,6 +314,9 @@ impl State{
             self.color = 0.0;
         }
 
+        //self.queue.submit(&[
+        //    encoder.finish()
+        //]);
         self.queue.submit(Some(encoder.finish()));
     }
 }
@@ -326,12 +369,6 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
         }
     });
 }
-#[cfg(target_arch = "wasm32")]
-macro_rules! log {
-    ( $( $t:tt )* ) => {
-        web_sys::console::log_1(&format!( $( $t )* ).into());
-    }
-}
 
 use std::fs;
 
@@ -372,6 +409,12 @@ pub async fn runn(url : &String) -> Result<JsValue, JsValue> {
     let text = JsFuture::from(resp.text()?).await?.as_string().unwrap();
     Ok(JsValue::from_serde(&text).unwrap())
 }
+    #[cfg(target_arch = "wasm32")]
+    macro_rules! log {
+        ( $( $t:tt )* ) => {
+            web_sys::console::log_1(&format!( $( $t )* ).into());
+        }
+    }
 
 #[cfg(target_arch = "wasm32")]
 pub async fn run_wrap()
@@ -382,7 +425,6 @@ pub async fn run_wrap()
 }
 
 fn main() {
-    /*
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
@@ -411,16 +453,15 @@ fn main() {
             .expect("couldn't append canvas to document body");
         wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
-    */
-    #[cfg(not(target_arch = "wasm32"))]
-    { println!("{}", load_file("resources/readme.txt"))
-    }
+    //#[cfg(not(target_arch = "wasm32"))]
+    //{ println!("{}", load_file("resources/readme.txt"))
+    //}
 
-    #[cfg(target_arch = "wasm32")]
-    {
-        wasm_bindgen_futures::spawn_local(run_wrap());
-        //log!("{}",);
-    }
+    //#[cfg(target_arch = "wasm32")]
+    //{
+    //    wasm_bindgen_futures::spawn_local(run_wrap());
+    //    //log!("{}",);
+    //}
 
 }
 //set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm
