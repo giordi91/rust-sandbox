@@ -180,8 +180,8 @@ impl State{
         });
 
 
-        let mut vs_module :Result<&wgpu::ShaderModule,&str>;
-        let mut fs_module :Result<&wgpu::ShaderModule,&str>;
+        let vs_module :Result<&wgpu::ShaderModule,&str>;
+        let fs_module :Result<&wgpu::ShaderModule,&str>;
         let mut shader_manager = shader::ShaderManager::new();
         #[cfg(not(target_arch = "wasm32"))]
         {

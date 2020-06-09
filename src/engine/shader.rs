@@ -9,6 +9,7 @@ pub enum ShaderType {
 
 use super::handle;
 
+
 pub struct Shader {
     pub shader_type: ShaderType,
     pub module: wgpu::ShaderModule,
@@ -121,8 +122,8 @@ impl ShaderManager {
                     None,
                 )
                 .unwrap();
+
             binary_data = wgpu::read_spirv(std::io::Cursor::new(spv_code.as_binary_u8())).unwrap();
-            panic!("should not be here");
         } else {
             let contents = fs::read(&file_name).expect("Something went wrong reading the spv file");
             binary_data = wgpu::read_spirv(std::io::Cursor::new(&contents[..])).unwrap()
@@ -162,16 +163,8 @@ impl ShaderManager {
         //let spv_exists = file_exists(&spv);
         let binary_data: Vec<u32>;
 
-
-       log!("shader path {}",spv); 
-
        //let content= load_file_wasm(&spv).await.unwrap().as_string().unwrap();
        let content= load_file_wasm(&spv).await.unwrap();
-       log!("what {}",content.len()*4); 
-
-       //log!("shader content {}",content); 
-        //let contents = fs::read(&file_name).expect("Something went wrong reading the spv file");
-        //let binary_data = wgpu::read_spirv(std::io::Cursor::new(&contents[..])).unwrap();
 
         let module = device.create_shader_module(&content);
 
@@ -179,7 +172,6 @@ impl ShaderManager {
             shader_type,
             module,
         };
-        log!("holy cow");
 
         self.shader_counter += 1;
         self.shader_mapper.insert(self.shader_counter, shader);
