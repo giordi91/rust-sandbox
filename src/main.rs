@@ -5,6 +5,7 @@ use winit::{
 };
 
 use rust_sandbox::engine::shader;
+use rust_sandbox::engine::platform;
 
 #[cfg_attr(rustfmt, rustfmt_skip)] //just to avoid the matrix being formatted
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -531,6 +532,10 @@ pub async fn run_wrap() {
 }
 
 fn main() {
+
+    platform::file_system::greet();
+
+
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
