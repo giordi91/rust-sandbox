@@ -53,33 +53,24 @@ pub async fn load_file_wasm(url : &String) -> Result<Vec<u32>, JsValue> {
     assert!(resp_value.is_instance_of::<Response>());
     let resp: Response = resp_value.dyn_into().unwrap();
 
-    log!("1");
-    //let vec : Vec<u32>
-    // Convert this other `Promise` into a rust `Future`.
+    //TODO investigate, any way to have less jumps around?
+    //we extract the array buffer from our response 
     let t : JsValue = JsFuture::from(resp.array_buffer()?).await?;
-    log!("2");
+    //we initialize the array buffer out of the JsValue
     let bt :js_sys::ArrayBuffer = js_sys::ArrayBuffer::from(t);
-    log!("3");
+    //next we use the array buffer to initialize a uin32Array
     let typebuf: js_sys::Uint32Array = js_sys::Uint32Array::new(&bt);
-    log!("4");
+    //finally we copy this array into the final vector
     let mut body = vec![0 as u32; typebuf.length() as usize];
-    log!("5");
     typebuf.copy_to(&mut body);
-    log!("6");
     Ok(body)
-
-
-    //let text = JsFuture::from(resp.text()?).await?.as_string().unwrap();
-    //Ok(JsValue::from_serde(&text).unwrap())
 }
 
 impl ShaderManager {
     pub fn new() -> Self {
         let shader_mapper: HashMap<u64, Shader> = HashMap::new();
-        //let compiler = shaderc::Compiler::new().unwrap();
         Self {
             shader_mapper,
-            //compiler,
             shader_counter: 0,
         }
     }
@@ -139,7 +130,6 @@ impl ShaderManager {
         self.shader_counter += 1;
         self.shader_mapper.insert(self.shader_counter, shader);
 
-
         handle::ResourceHandle::new(handle::ResourceHandleType::SHADER,self.shader_counter)
     }
 
@@ -159,9 +149,6 @@ impl ShaderManager {
 
         let shader_file = format!("{}{}", shader_name, ext);
         let spv = format!("{}{}", &shader_file[..], SPIRV_EXT);
-
-        //let spv_exists = file_exists(&spv);
-        let binary_data: Vec<u32>;
 
        //let content= load_file_wasm(&spv).await.unwrap().as_string().unwrap();
        let content= load_file_wasm(&spv).await.unwrap();

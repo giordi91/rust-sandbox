@@ -24,6 +24,95 @@ struct Camera {
     zfar: f32,
 }
 
+struct CameraController {
+    speed: f32,
+    is_up_pressed: bool,
+    is_down_pressed: bool,
+    is_forward_pressed: bool,
+    is_backward_pressed: bool,
+    is_left_pressed: bool,
+    is_right_pressed: bool,
+}
+
+impl CameraController {
+    fn new(speed: f32) -> Self {
+        Self {
+            speed,
+            is_up_pressed: false,
+            is_down_pressed: false,
+            is_forward_pressed: false,
+            is_backward_pressed: false,
+            is_left_pressed: false,
+            is_right_pressed: false,
+        }
+    }
+
+    fn process_events(&mut self, event: &WindowEvent) -> bool {
+        match event {
+            WindowEvent::KeyboardInput {
+                input:
+                    KeyboardInput {
+                        state,
+                        virtual_keycode: Some(keycode),
+                        ..
+                    },
+                ..
+            } => {
+                let is_pressed = *state == ElementState::Pressed;
+                match keycode {
+                    VirtualKeyCode::Space => {
+                        self.is_up_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::LShift => {
+                        self.is_down_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::W | VirtualKeyCode::Up => {
+                        self.is_forward_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::A | VirtualKeyCode::Left => {
+                        self.is_left_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::S | VirtualKeyCode::Down => {
+                        self.is_backward_pressed = is_pressed;
+                        true
+                    }
+                    VirtualKeyCode::D | VirtualKeyCode::Right => {
+                        self.is_right_pressed = is_pressed;
+                        true
+                    }
+                    _ => false,
+                }
+            }
+            _ => false,
+        }
+    }
+
+    fn update_camera(&self, camera: &mut Camera) {
+        use cgmath::InnerSpace;
+        let forward = (camera.target - camera.eye).normalize();
+
+        if self.is_forward_pressed {
+            camera.eye += forward * self.speed;
+        }
+        if self.is_backward_pressed {
+            camera.eye -= forward * self.speed;
+        }
+
+        let right = forward.cross(camera.up);
+
+        if self.is_right_pressed {
+            camera.eye += right * self.speed;
+        }
+        if self.is_left_pressed {
+            camera.eye -= right * self.speed;
+        }
+    }
+}
+
 impl Camera {
     fn build_view_projection_matrix(&self) -> cgmath::Matrix4<f32> {
         let view = cgmath::Matrix4::look_at(self.eye, self.target, self.up);
@@ -54,7 +143,7 @@ impl Uniforms {
 unsafe impl bytemuck::Pod for Uniforms {}
 unsafe impl bytemuck::Zeroable for Uniforms {}
 
-struct State{
+struct State {
     _instance: wgpu::Instance,
     surface: wgpu::Surface,
     _adapter: wgpu::Adapter,
@@ -68,9 +157,11 @@ struct State{
     uniform_bind_group: wgpu::BindGroup,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
-    shader_manager: shader::ShaderManager
+    shader_manager: shader::ShaderManager,
+    camera_controller: CameraController,
+    uniforms: Uniforms
 }
-impl State{
+impl State {
     async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
         let size = window.inner_size();
 
@@ -90,7 +181,7 @@ impl State{
         let (device, queue) = _adapter
             .request_device(
                 &wgpu::DeviceDescriptor {
-                    extensions: wgpu::Extensions{
+                    extensions: wgpu::Extensions {
                         anisotropic_filtering: true,
                     },
                     limits: wgpu::Limits::default(),
@@ -125,18 +216,11 @@ impl State{
             zfar: 100.0,
         };
 
+        let camera_controller = CameraController::new(0.02);
+
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
 
-        /*
-        let uniform_buffer = device.create_buffer(&wgpu::BufferDescriptor {
-            label: None,
-            size: 64,
-            usage: wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        });
-
-        queue.write_buffer(&uniform_buffer,0,bytemuck::cast_slice(&[uniforms]));
-        */
         let uniform_buffer = device.create_buffer_with_data(
             bytemuck::cast_slice(&[uniforms]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
@@ -152,59 +236,54 @@ impl State{
                 label: Some("uniform_bind_group_layout"),
             });
 
-            /*
         let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
-                resource: wgpu::BindingResource::Buffer(uniform_buffer.slice(..)),
+                resource: wgpu::BindingResource::Buffer {
+                    buffer: &uniform_buffer,
+                    // FYI: you can share a single buffer between bindings.
+                    range: 0..std::mem::size_of_val(&uniforms) as wgpu::BufferAddress,
+                },
             }],
-
-
-            label: Some("uniform_bind_group"),
-        });
-        */
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            bindings: &[
-                wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buffer,
-                        // FYI: you can share a single buffer between bindings.
-                        range: 0..std::mem::size_of_val(&uniforms) as wgpu::BufferAddress,
-                    }
-                }
-            ],
             label: Some("uniform_bind_group"),
         });
 
-
-        let vs_module :Result<&wgpu::ShaderModule,&str>;
-        let fs_module :Result<&wgpu::ShaderModule,&str>;
+        let vs_module: Result<&wgpu::ShaderModule, &str>;
+        let fs_module: Result<&wgpu::ShaderModule, &str>;
         let mut shader_manager = shader::ShaderManager::new();
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX);
-            let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT);
+            let vs_handle = shader_manager.load_shader_type(
+                &device,
+                "resources/shader",
+                shader::ShaderType::VERTEX,
+            );
+            let fs_handle = shader_manager.load_shader_type(
+                &device,
+                "resources/shader",
+                shader::ShaderType::FRAGMENT,
+            );
             vs_module = shader_manager.get_shader_module(&vs_handle);
             fs_module = shader_manager.get_shader_module(&fs_handle);
         }
 
         #[cfg(target_arch = "wasm32")]
         {
-            let vs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX).await;
-            let fs_handle= shader_manager.load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT).await;
+            let vs_handle = shader_manager
+                .load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX)
+                .await;
+            let fs_handle = shader_manager
+                .load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT)
+                .await;
             vs_module = shader_manager.get_shader_module(&vs_handle);
             fs_module = shader_manager.get_shader_module(&fs_handle);
         }
-
 
         let render_pipeline_layout =
             device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 bind_group_layouts: &[&uniform_bind_group_layout],
             });
-            
 
         let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &render_pipeline_layout,
@@ -255,10 +334,11 @@ impl State{
             uniform_bind_group,
             size,
             color,
-            shader_manager
+            shader_manager,
+            camera_controller,
+            uniforms,
         }
     }
-
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.size = new_size;
@@ -268,18 +348,48 @@ impl State{
     }
 
     // input() won't deal with GPU code, so it can be synchronous
-    fn input(&mut self, _event: &WindowEvent) -> bool {
-        false
+    fn input(&mut self, event: &WindowEvent) -> bool {
+        self.camera_controller.process_events(event)
     }
 
     fn update(&mut self) {
         //not doing anything here yet
+        self.camera_controller.update_camera(&mut self.camera);
+        self.uniforms.update_view_proj(&self.camera);
+
+        // Copy operation's are performed on the gpu, so we'll need
+        // a CommandEncoder for that
+        let mut encoder = self
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("update encoder"),
+            });
+
+        let staging_buffer = self.device.create_buffer_with_data(
+            bytemuck::cast_slice(&[self.uniforms]),
+            wgpu::BufferUsage::COPY_SRC,
+        );
+
+        encoder.copy_buffer_to_buffer(
+            &staging_buffer,
+            0,
+            &self.uniform_buffer,
+            0,
+            std::mem::size_of::<Uniforms>() as wgpu::BufferAddress,
+        );
+
+        // We need to remember to submit our CommandEncoder's output
+        // otherwise we won't see any change.
+        //self.queue.submit(&[encoder.finish()]);
+        self.queue.submit(Some(encoder.finish()));
     }
 
     fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
-        let frame = self.swap_chain.get_next_texture()
-        .expect("Timeout getting texture");
+        let frame = self
+            .swap_chain
+            .get_next_texture()
+            .expect("Timeout getting texture");
 
         //this is the command buffer we use to record commands
         let mut encoder = self
@@ -325,7 +435,6 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
     let mut state = State::new(&window, swapchain_format).await;
 
     event_loop.run(move |event, _, control_flow| {
-
         *control_flow = ControlFlow::Poll;
         //This match statement is still slightly confusing for me, need to investigate a
         //bit more
@@ -373,11 +482,9 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
 use std::fs;
 
 #[cfg(not(target_arch = "wasm32"))]
-pub fn load_file(path: &str) -> String  {
+pub fn load_file(path: &str) -> String {
     fs::read_to_string(&path).expect("")
 }
-
-
 
 #[cfg(target_arch = "wasm32")]
 use serde::{Deserialize, Serialize};
@@ -391,7 +498,7 @@ use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
 #[cfg(target_arch = "wasm32")]
-pub async fn runn(url : &String) -> Result<JsValue, JsValue> {
+pub async fn runn(url: &String) -> Result<JsValue, JsValue> {
     let mut opts = RequestInit::new();
     opts.method("GET");
     opts.mode(RequestMode::Cors);
@@ -409,19 +516,18 @@ pub async fn runn(url : &String) -> Result<JsValue, JsValue> {
     let text = JsFuture::from(resp.text()?).await?.as_string().unwrap();
     Ok(JsValue::from_serde(&text).unwrap())
 }
-    #[cfg(target_arch = "wasm32")]
-    macro_rules! log {
+#[cfg(target_arch = "wasm32")]
+macro_rules! log {
         ( $( $t:tt )* ) => {
             web_sys::console::log_1(&format!( $( $t )* ).into());
         }
     }
 
 #[cfg(target_arch = "wasm32")]
-pub async fn run_wrap()
-{
+pub async fn run_wrap() {
     let url = String::from("resources/readme.txt");
     let my_str = runn(&url).await.unwrap().as_string().unwrap();
-    log!("content of file {} is --> {}",&url, my_str);
+    log!("content of file {} is --> {}", &url, my_str);
 }
 
 fn main() {
@@ -453,15 +559,5 @@ fn main() {
             .expect("couldn't append canvas to document body");
         wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
-    //#[cfg(not(target_arch = "wasm32"))]
-    //{ println!("{}", load_file("resources/readme.txt"))
-    //}
-
-    //#[cfg(target_arch = "wasm32")]
-    //{
-    //    wasm_bindgen_futures::spawn_local(run_wrap());
-    //    //log!("{}",);
-    //}
-
 }
 //set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm
