@@ -150,7 +150,6 @@ impl ShaderManager {
         let shader_file = format!("{}{}", shader_name, ext);
         let spv = format!("{}{}", &shader_file[..], SPIRV_EXT);
 
-       //let content= load_file_wasm(&spv).await.unwrap().as_string().unwrap();
        let content= load_file_wasm(&spv).await.unwrap();
 
         let module = device.create_shader_module(&content);
