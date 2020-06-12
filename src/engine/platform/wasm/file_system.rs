@@ -6,5 +6,5 @@ macro_rules! log {
     }
 
 pub fn greet() {
-    println!("HELLLOOOOOOO FROM WASM");
+    log!("HELLLOOOOOOO FROM WASM");
 }
