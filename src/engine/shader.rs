@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 
 use super::platform;
-use crate::engine::platform::file_system;
+use super::platform::file_system;
 
 const SPIRV_EXT: &'static str = ".spv";
 pub enum ShaderType {
@@ -27,35 +27,9 @@ pub struct ShaderManager {
 //value to keep the compiler happy. I will revisit in the future.
 //One option is to expose the compile shader function as a trait and then pull this 
 //correctly from the native module
-#[cfg(not(target_arch = "wasm32"))]
-async fn compile_shader(file_name: &String, shader_type: &ShaderType) -> Vec<u32> {
-    let compile_shader_type = match shader_type {
-        ShaderType::VERTEX => shaderc::ShaderKind::Vertex,
-        ShaderType::FRAGMENT => shaderc::ShaderKind::Fragment,
-    };
+//#[cfg(not(target_arch = "wasm32"))]
 
-    let contents = file_system::load_file_string(&file_name)
-        .await
-        .expect("Something went wrong reading the shader source file");
-    //generating the spv, does not work on browser context
-    let mut compiler = shaderc::Compiler::new().unwrap();
-    let spv_code = compiler
-        .compile_into_spirv(
-            &contents[..],
-            compile_shader_type,
-            &file_name[..],
-            "main",
-            None,
-        )
-        .unwrap();
-
-    wgpu::read_spirv(std::io::Cursor::new(spv_code.as_binary_u8())).unwrap()
-}
-
-#[cfg(target_arch = "wasm32")]
-async fn compile_shader(file_name: &String, shader_type: &ShaderType) -> Vec<u32> {
-    Vec::new()
-}
+//#[cfg(target_arch = "wasm32")]
 
 impl ShaderManager {
     pub fn new() -> Self {
@@ -96,7 +70,7 @@ impl ShaderManager {
         let binary_data: Vec<u32>;
 
         if !spv_exists {
-            binary_data = compile_shader(&file_name, &shader_type).await;
+            binary_data = platform::shader::compile_shader(&file_name, &shader_type).await;
         } else {
             let contents = file_system::load_file_u8(&file_name).await.unwrap();
             binary_data = wgpu::read_spirv(std::io::Cursor::new(&contents[..])).unwrap()

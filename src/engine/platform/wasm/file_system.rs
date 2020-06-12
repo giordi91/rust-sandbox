@@ -1,10 +1,9 @@
-use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
-use super::platform_core;
+use super::core;
 
 pub async fn load_file_u8(url : &String) -> Result<Vec<u8>, JsValue> {
     let mut opts = RequestInit::new();
@@ -61,8 +60,8 @@ pub async fn file_exists(file_name: &str) -> bool {
     let request = match request_opt {
         Ok(req) => req,
         Err(e) => {
-            let message = format!("[Error]: Could not make HTTP request for file {}",file_name);
-            platform_core::to_console(&message[..]);
+            let message = format!("[Error]: Could not make HTTP request for file {} with error {:?}",file_name,e);
+            core::to_console(&message[..]);
             return false
         }
     };
@@ -73,8 +72,8 @@ pub async fn file_exists(file_name: &str) -> bool {
     {
         Ok(resp) => resp,
         Err(e) => {
-            let message = format!("[Error]: Could not make fetch request for file {}",file_name);
-            platform_core::to_console(&message[..]);
+            let message = format!("[Error]: Could not make fetch request for file {} with error {:?}",file_name,e);
+            core::to_console(&message[..]);
             return false 
         }
     };

@@ -480,56 +480,6 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
     });
 }
 
-use std::fs;
-
-#[cfg(not(target_arch = "wasm32"))]
-pub fn load_file(path: &str) -> String {
-    fs::read_to_string(&path).expect("")
-}
-
-#[cfg(target_arch = "wasm32")]
-use serde::{Deserialize, Serialize};
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::prelude::*;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen::JsCast;
-#[cfg(target_arch = "wasm32")]
-use wasm_bindgen_futures::JsFuture;
-#[cfg(target_arch = "wasm32")]
-use web_sys::{Request, RequestInit, RequestMode, Response};
-
-#[cfg(target_arch = "wasm32")]
-pub async fn runn(url: &String) -> Result<JsValue, JsValue> {
-    let mut opts = RequestInit::new();
-    opts.method("GET");
-    opts.mode(RequestMode::Cors);
-
-    let request = Request::new_with_str_and_init(&url, &opts)?;
-
-    let window = web_sys::window().unwrap();
-    let resp_value = JsFuture::from(window.fetch_with_request(&request)).await?;
-
-    // `resp_value` is a `Response` object.
-    assert!(resp_value.is_instance_of::<Response>());
-    let resp: Response = resp_value.dyn_into().unwrap();
-
-    // Convert this other `Promise` into a rust `Future`.
-    let text = JsFuture::from(resp.text()?).await?.as_string().unwrap();
-    Ok(JsValue::from_serde(&text).unwrap())
-}
-#[cfg(target_arch = "wasm32")]
-macro_rules! log {
-        ( $( $t:tt )* ) => {
-            web_sys::console::log_1(&format!( $( $t )* ).into());
-        }
-    }
-
-#[cfg(target_arch = "wasm32")]
-pub async fn run_wrap() {
-    let url = String::from("resources/readme.txt");
-    let my_str = runn(&url).await.unwrap().as_string().unwrap();
-    log!("content of file {} is --> {}", &url, my_str);
-}
 
 fn main() {
     let event_loop = EventLoop::new();
