@@ -21,6 +21,12 @@ pub struct ShaderManager {
     shader_counter: u64,
 }
 
+//I tried to limit this to a minimum, unluckily here I can only compile shaders on native
+//not browser (as of now ). Splitting between native and wasm was a bit overkill so for
+//now it was split here. The wasm32 version should never be called and just return and empty
+//value to keep the compiler happy. I will revisit in the future.
+//One option is to expose the compile shader function as a trait and then pull this 
+//correctly from the native module
 #[cfg(not(target_arch = "wasm32"))]
 async fn compile_shader(file_name: &String, shader_type: &ShaderType) -> Vec<u32> {
     let compile_shader_type = match shader_type {
@@ -77,7 +83,7 @@ impl ShaderManager {
 
         let shader_file = format!("{}{}", shader_name, ext);
         let spv = format!("{}{}", &shader_file[..], SPIRV_EXT);
-        let spv_exists = match file_system::get_platform() {
+        let spv_exists = match platform::core::get_platform() {
             //if we are in the browser we can only load spv, so we force the file to
             //exists and we will try to download it, we could use the file_exists for wasm
             //but is an expensive download, so we just try to download it later on. The

@@ -1,18 +1,10 @@
-
-use super::super::Platform;
-use super::platform_core;
-
-pub fn get_platform() -> Platform
-{
-    Platform::BROWSER
-}
-
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::JsFuture;
 use web_sys::{Request, RequestInit, RequestMode, Response};
 
+use super::platform_core;
 
 pub async fn load_file_u8(url : &String) -> Result<Vec<u8>, JsValue> {
     let mut opts = RequestInit::new();

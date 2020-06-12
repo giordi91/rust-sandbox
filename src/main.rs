@@ -5,7 +5,6 @@ use winit::{
 };
 
 use rust_sandbox::engine::platform;
-use rust_sandbox::engine::platform::platform_core;
 use rust_sandbox::engine::shader;
 
 #[cfg_attr(rustfmt, rustfmt_skip)] //just to avoid the matrix being formatted
@@ -539,9 +538,10 @@ fn main() {
 
     let plat_str = format!(
         "Start up on platform: {:?}",
-        platform::file_system::get_platform()
+        platform::core::get_platform()
     );
-    platform_core::to_console(&plat_str[..]);
+
+    platform::core::to_console(&plat_str[..]);
     #[cfg(not(target_arch = "wasm32"))]
     {
         //env_logger::init();

@@ -1,12 +1,5 @@
-use std::fs;
 use std::io;
-
-use super::super::Platform;
-
-pub fn get_platform() -> Platform
-{
-    Platform::NATIVE
-}
+use std::fs;
 
 pub async fn load_file_u8(file_name: &String) -> Result<Vec<u8>, io::Error> {
     fs::read(file_name)
