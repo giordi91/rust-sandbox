@@ -21,16 +21,6 @@ pub struct ShaderManager {
     shader_counter: u64,
 }
 
-//I tried to limit this to a minimum, unluckily here I can only compile shaders on native
-//not browser (as of now ). Splitting between native and wasm was a bit overkill so for
-//now it was split here. The wasm32 version should never be called and just return and empty
-//value to keep the compiler happy. I will revisit in the future.
-//One option is to expose the compile shader function as a trait and then pull this 
-//correctly from the native module
-//#[cfg(not(target_arch = "wasm32"))]
-
-//#[cfg(target_arch = "wasm32")]
-
 impl ShaderManager {
     pub fn new() -> Self {
         let shader_mapper: HashMap<u64, Shader> = HashMap::new();
