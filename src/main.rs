@@ -4,8 +4,9 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use rust_sandbox::engine::shader;
 use rust_sandbox::engine::platform;
+use rust_sandbox::engine::platform::platform_core;
+use rust_sandbox::engine::shader;
 
 #[cfg_attr(rustfmt, rustfmt_skip)] //just to avoid the matrix being formatted
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
@@ -160,7 +161,7 @@ struct State {
     color: f64,
     shader_manager: shader::ShaderManager,
     camera_controller: CameraController,
-    uniforms: Uniforms
+    uniforms: Uniforms,
 }
 impl State {
     async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
@@ -532,14 +533,15 @@ pub async fn run_wrap() {
 }
 
 fn main() {
-
-    platform::file_system::greet();
-
-
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
 
+    let plat_str = format!(
+        "Start up on platform: {:?}",
+        platform::file_system::get_platform()
+    );
+    platform_core::to_console(&plat_str[..]);
     #[cfg(not(target_arch = "wasm32"))]
     {
         //env_logger::init();

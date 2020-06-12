@@ -1,7 +1,7 @@
 
+use super::super::Platform;
 
-
-pub fn greet() 
+pub fn get_platform() -> Platform
 {
-    println!("HELLLOOOOOOO FROM NATIVE");
+    Platform::NATIVE
 }
