@@ -43,44 +43,9 @@ struct State {
     uniforms: Uniforms,
 }
 impl State {
-    async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
+    async fn new(window: &Window, gpu_interfaces: GPUInterfaces) -> Self {
         let size = window.inner_size();
 
-        let _instance = wgpu::Instance::new();
-        let surface = unsafe { _instance.create_surface(window) };
-        let _adapter = _instance
-            .request_adapter(
-                &wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::Default,
-                    compatible_surface: Some(&surface),
-                },
-                wgpu::BackendBit::PRIMARY,
-            )
-            .await
-            .unwrap();
-
-        let (device, queue) = _adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    extensions: wgpu::Extensions {
-                        anisotropic_filtering: true,
-                    },
-                    limits: wgpu::Limits::default(),
-                },
-                None,
-            )
-            .await
-            .unwrap();
-
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: swapchain_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Mailbox,
-        };
-
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
         let color = 0.0;
 
         let camera = graphics::camera::Camera {
@@ -91,7 +56,7 @@ impl State {
             target: (0.0, 0.0, 0.0).into(),
             // which way is "up"
             up: cgmath::Vector3::unit_y(),
-            aspect: sc_desc.width as f32 / sc_desc.height as f32,
+            aspect: gpu_interfaces.sc_desc.width as f32 / gpu_interfaces.sc_desc.height as f32,
             fovy: 45.0,
             znear: 0.1,
             zfar: 100.0,
@@ -102,13 +67,13 @@ impl State {
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
 
-        let uniform_buffer = device.create_buffer_with_data(
+        let uniform_buffer = gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(&[uniforms]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
         let uniform_bind_group_layout =
-            device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+            gpu_interfaces.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
                 bindings: &[wgpu::BindGroupLayoutEntry {
                     binding: 0,
                     visibility: wgpu::ShaderStage::VERTEX,
@@ -117,7 +82,7 @@ impl State {
                 label: Some("uniform_bind_group_layout"),
             });
 
-        let uniform_bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        let uniform_bind_group = gpu_interfaces.device.create_bind_group(&wgpu::BindGroupDescriptor {
             layout: &uniform_bind_group_layout,
             bindings: &[wgpu::Binding {
                 binding: 0,
@@ -136,10 +101,10 @@ impl State {
         #[cfg(not(target_arch = "wasm32"))]
         {
             let vs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX)
+                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::VERTEX)
                 .await;
             let fs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT)
+                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::FRAGMENT)
                 .await;
             vs_module = shader_manager.get_shader_module(&vs_handle);
             fs_module = shader_manager.get_shader_module(&fs_handle);
@@ -158,11 +123,11 @@ impl State {
         }
 
         let render_pipeline_layout =
-            device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+            gpu_interfaces.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
                 bind_group_layouts: &[&uniform_bind_group_layout],
             });
 
-        let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+        let render_pipeline = gpu_interfaces.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
             layout: &render_pipeline_layout,
             vertex_stage: wgpu::ProgrammableStageDescriptor {
                 module: (vs_module.unwrap()),
@@ -181,7 +146,7 @@ impl State {
                 depth_bias_clamp: 0.0,
             }),
             color_states: &[wgpu::ColorStateDescriptor {
-                format: sc_desc.format,
+                format: gpu_interfaces.sc_desc.format,
                 color_blend: wgpu::BlendDescriptor::REPLACE,
                 alpha_blend: wgpu::BlendDescriptor::REPLACE,
                 write_mask: wgpu::ColorWrite::ALL,
@@ -196,15 +161,6 @@ impl State {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
-        let gpu_interfaces = GPUInterfaces {
-            _instance,
-            surface,
-            _adapter,
-            device,
-            queue,
-            sc_desc,
-            swap_chain,
-        };
 
         Self {
             gpu_interfaces,
@@ -326,8 +282,68 @@ struct GPUInterfaces {
     swap_chain: wgpu::SwapChain,
 }
 
+impl GPUInterfaces
+{
+    pub async fn new(window:&Window, swapchain_format: wgpu::TextureFormat ) ->Self{
+        let size = window.inner_size();
+
+        let _instance = wgpu::Instance::new();
+        let surface = unsafe { _instance.create_surface(window) };
+        let _adapter = _instance
+            .request_adapter(
+                &wgpu::RequestAdapterOptions {
+                    power_preference: wgpu::PowerPreference::Default,
+                    compatible_surface: Some(&surface),
+                },
+                wgpu::BackendBit::PRIMARY,
+            )
+            .await
+            .unwrap();
+
+        let (device, queue) = _adapter
+            .request_device(
+                &wgpu::DeviceDescriptor {
+                    extensions: wgpu::Extensions {
+                        anisotropic_filtering: true,
+                    },
+                    limits: wgpu::Limits::default(),
+                },
+                None,
+            )
+            .await
+            .unwrap();
+
+        let sc_desc = wgpu::SwapChainDescriptor {
+            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            format: swapchain_format,
+            width: size.width,
+            height: size.height,
+            present_mode: wgpu::PresentMode::Mailbox,
+        };
+
+        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
+
+        Self
+        {
+            _instance,
+            surface,
+            _adapter,
+            device,
+            queue,
+            sc_desc,
+            swap_chain,
+        }
+
+    }
+
+
+}
+
 pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
-    let mut state = State::new(&window, swapchain_format).await;
+
+    let gpu_interfaces = GPUInterfaces::new(&window, swapchain_format).await; 
+
+    let mut state = State::new(&window, gpu_interfaces ).await;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
