@@ -5,8 +5,8 @@ use winit::{
 };
 
 use rust_sandbox::engine::graphics;
-use rust_sandbox::engine::platform;
 use rust_sandbox::engine::graphics::shader;
+use rust_sandbox::engine::platform;
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -31,13 +31,7 @@ unsafe impl bytemuck::Pod for Uniforms {}
 unsafe impl bytemuck::Zeroable for Uniforms {}
 
 struct State {
-    _instance: wgpu::Instance,
-    surface: wgpu::Surface,
-    _adapter: wgpu::Adapter,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    sc_desc: wgpu::SwapChainDescriptor,
-    swap_chain: wgpu::SwapChain,
+    gpu_interfaces: GPUInterfaces,
     render_pipeline: wgpu::RenderPipeline,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
@@ -45,7 +39,7 @@ struct State {
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
     shader_manager: shader::ShaderManager,
-    camera_controller: graphics::camera::CameraController,
+    camera_controller: graphics::camera::CameraControllerFPS,
     uniforms: Uniforms,
 }
 impl State {
@@ -103,7 +97,7 @@ impl State {
             zfar: 100.0,
         };
 
-        let camera_controller = graphics::camera::CameraController::new(0.02);
+        let camera_controller = graphics::camera::CameraControllerFPS::new(0.02);
 
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
@@ -141,16 +135,12 @@ impl State {
         let mut shader_manager = shader::ShaderManager::new();
         #[cfg(not(target_arch = "wasm32"))]
         {
-            let vs_handle = shader_manager.load_shader_type(
-                &device,
-                "resources/shader",
-                shader::ShaderType::VERTEX,
-            ).await;
-            let fs_handle = shader_manager.load_shader_type(
-                &device,
-                "resources/shader",
-                shader::ShaderType::FRAGMENT,
-            ).await;
+            let vs_handle = shader_manager
+                .load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX)
+                .await;
+            let fs_handle = shader_manager
+                .load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT)
+                .await;
             vs_module = shader_manager.get_shader_module(&vs_handle);
             fs_module = shader_manager.get_shader_module(&fs_handle);
         }
@@ -206,8 +196,7 @@ impl State {
             sample_mask: !0,
             alpha_to_coverage_enabled: false,
         });
-
-        Self {
+        let gpu_interfaces = GPUInterfaces {
             _instance,
             surface,
             _adapter,
@@ -215,6 +204,10 @@ impl State {
             queue,
             sc_desc,
             swap_chain,
+        };
+
+        Self {
+            gpu_interfaces,
             render_pipeline,
             camera,
             uniform_buffer,
@@ -226,12 +219,17 @@ impl State {
             uniforms,
         }
     }
+}
 
+impl Application for State {
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.size = new_size;
-        self.sc_desc.width = new_size.width;
-        self.sc_desc.height = new_size.height;
-        self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+        self.gpu_interfaces.sc_desc.width = new_size.width;
+        self.gpu_interfaces.sc_desc.height = new_size.height;
+        self.gpu_interfaces.swap_chain = self
+            .gpu_interfaces
+            .device
+            .create_swap_chain(&self.gpu_interfaces.surface, &self.gpu_interfaces.sc_desc);
     }
 
     // input() won't deal with GPU code, so it can be synchronous
@@ -247,12 +245,12 @@ impl State {
         // Copy operation's are performed on the gpu, so we'll need
         // a CommandEncoder for that
         let mut encoder = self
-            .device
+            .gpu_interfaces.device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("update encoder"),
             });
 
-        let staging_buffer = self.device.create_buffer_with_data(
+        let staging_buffer = self.gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(&[self.uniforms]),
             wgpu::BufferUsage::COPY_SRC,
         );
@@ -268,19 +266,19 @@ impl State {
         // We need to remember to submit our CommandEncoder's output
         // otherwise we won't see any change.
         //self.queue.submit(&[encoder.finish()]);
-        self.queue.submit(Some(encoder.finish()));
+        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
     }
 
     fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
-            .swap_chain
+            .gpu_interfaces.swap_chain
             .get_next_texture()
             .expect("Timeout getting texture");
 
         //this is the command buffer we use to record commands
         let mut encoder = self
-            .device
+            .gpu_interfaces.device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                 label: Some("Render Encoder"),
             });
@@ -314,8 +312,18 @@ impl State {
         //self.queue.submit(&[
         //    encoder.finish()
         //]);
-        self.queue.submit(Some(encoder.finish()));
+        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
     }
+}
+
+struct GPUInterfaces {
+    _instance: wgpu::Instance,
+    surface: wgpu::Surface,
+    _adapter: wgpu::Adapter,
+    device: wgpu::Device,
+    queue: wgpu::Queue,
+    sc_desc: wgpu::SwapChainDescriptor,
+    swap_chain: wgpu::SwapChain,
 }
 
 pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
@@ -366,18 +374,22 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
     });
 }
 
+trait Application {
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
+    // input() won't deal with GPU code, so it can be synchronous
+    fn input(&mut self, event: &WindowEvent) -> bool;
+    fn update(&mut self);
+    fn render(&mut self);
+}
 
 fn main() {
     let event_loop = EventLoop::new();
     let window = WindowBuilder::new().build(&event_loop).unwrap();
     window.set_title("Rust Sandbox v0.0.1");
 
-    let plat_str = format!(
-        "Start up on platform: {:?}",
-        platform::core::get_platform()
-    );
-
+    let plat_str = format!("Start up on platform: {:?}", platform::core::get_platform());
     platform::core::to_console(&plat_str[..]);
+
     #[cfg(not(target_arch = "wasm32"))]
     {
         //env_logger::init();
