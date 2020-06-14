@@ -1,4 +1,4 @@
-use crate::engine::shader::ShaderType;
+use crate::engine::graphics::shader::ShaderType;
 use super::file_system;
 
 pub async fn compile_shader(file_name: &String, shader_type: &ShaderType) -> Vec<u32> {

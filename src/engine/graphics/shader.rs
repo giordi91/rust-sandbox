@@ -1,7 +1,8 @@
 use std::collections::HashMap;
 
-use super::platform;
-use super::platform::file_system;
+use super::super::platform;
+use super::super::platform::file_system;
+use super::super::handle;
 
 const SPIRV_EXT: &'static str = ".spv";
 pub enum ShaderType {
@@ -9,7 +10,6 @@ pub enum ShaderType {
     FRAGMENT,
 }
 
-use super::handle;
 
 pub struct Shader {
     pub shader_type: ShaderType,
