@@ -7,16 +7,17 @@ use winit::{
 mod sandbox;
 
 use sandbox::Sandbox;
+use sandbox::App;
 use rust_sandbox::engine::platform;
 use rust_sandbox::engine::runtime;
 
 
-pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
+pub async fn run<T:App>(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
 
     //instantiating the engine innerworking and move it to the application
     let engine_runtime = runtime::Runtime::new(&window, swapchain_format).await;
-    let mut app = Sandbox::new(&window, engine_runtime).await;
 
+    let mut app = T::new(&window, engine_runtime).await;
     event_loop.run(move |event, _, control_flow| {
 
         *control_flow = ControlFlow::Poll;
@@ -77,7 +78,7 @@ fn main() {
         //env_logger::init();
         // Temporarily avoid srgb formats for the swapchain on the web
         // Since main can't be async, we're going to need to block
-        futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        futures::executor::block_on(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -94,7 +95,7 @@ fn main() {
                     .ok()
             })
             .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        wasm_bindgen_futures::spawn_local(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 }
 //set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm

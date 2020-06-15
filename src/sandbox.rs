@@ -8,6 +8,18 @@ use rust_sandbox::engine::graphics::api;
 use rust_sandbox::engine::graphics::shader;
 use rust_sandbox::engine::runtime;
 
+use async_trait::async_trait;
+
+#[async_trait(?Send)]
+pub trait App : 'static + Sized
+{
+    async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self; 
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>); 
+    fn input(&mut self, event: &WindowEvent) -> bool; 
+    fn update(&mut self);
+    fn render(&mut self); 
+}
+
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -45,8 +57,10 @@ pub struct Sandbox {
     uniforms: Uniforms,
 }
 
-impl Sandbox{
-    pub async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self {
+#[async_trait(?Send)]
+impl App for Sandbox
+{
+    async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self {
         let size = window.inner_size();
 
         let color = 0.0;
@@ -198,17 +212,17 @@ impl Sandbox{
         }
     }
 
-    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.engine_runtime.gpu_interfaces.resize(new_size);
         self.size = new_size;
     }
 
     // input() won't deal with GPU code, so it can be synchronous
-    pub fn input(&mut self, event: &WindowEvent) -> bool {
+    fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
     }
 
-    pub fn update(&mut self) {
+    fn update(&mut self) {
         //not doing anything here yet
         self.camera_controller.update_camera(&mut self.camera);
         self.uniforms.update_view_proj(&self.camera);
@@ -241,7 +255,7 @@ impl Sandbox{
         self.engine_runtime.gpu_interfaces.queue.submit(Some(encoder.finish()));
     }
 
-    pub fn render(&mut self) {
+    fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
             .engine_runtime.gpu_interfaces
