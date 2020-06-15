@@ -128,10 +128,10 @@ impl Sandbox {
         #[cfg(target_arch = "wasm32")]
         {
             let vs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX)
+                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::VERTEX)
                 .await;
             let fs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT)
+                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::FRAGMENT)
                 .await;
             vs_module = shader_manager.get_shader_module(&vs_handle);
             fs_module = shader_manager.get_shader_module(&fs_handle);
