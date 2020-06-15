@@ -7,17 +7,18 @@ use winit::{
 mod sandbox;
 
 use sandbox::Sandbox;
-use rust_sandbox::engine::application::Application;
-use rust_sandbox::engine::graphics::api;
 use rust_sandbox::engine::platform;
+use rust_sandbox::engine::runtime;
 
 
-pub async fn run<T>(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
-    let gpu_interfaces = api::GPUInterfaces::new(&window, swapchain_format).await;
+pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
 
-    let mut app = Sandbox::new(&window, gpu_interfaces).await;
+    //instantiating the engine innerworking and move it to the application
+    let engine_runtime = runtime::Runtime::new(&window, swapchain_format).await;
+    let mut app = Sandbox::new(&window, engine_runtime).await;
 
     event_loop.run(move |event, _, control_flow| {
+
         *control_flow = ControlFlow::Poll;
         //This match statement is still slightly confusing for me, need to investigate a
         //bit more
@@ -42,7 +43,6 @@ pub async fn run<T>(event_loop: EventLoop<()>, window: Window, swapchain_format:
                         }
                         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                             // new_inner_size is &mut so w have to dereference it twice
-                            app.gpu_interfaces.resize(**new_inner_size);
                             app.resize(**new_inner_size);
                         }
                         _ => {}
@@ -77,7 +77,7 @@ fn main() {
         //env_logger::init();
         // Temporarily avoid srgb formats for the swapchain on the web
         // Since main can't be async, we're going to need to block
-        futures::executor::block_on(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -94,7 +94,7 @@ fn main() {
                     .ok()
             })
             .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 }
 //set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm

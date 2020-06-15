@@ -3,10 +3,10 @@ use winit::{
     window::Window,
 };
 
-use rust_sandbox::engine::application::Application;
 use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::graphics::api;
 use rust_sandbox::engine::graphics::shader;
+use rust_sandbox::engine::runtime;
 
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
@@ -33,7 +33,7 @@ unsafe impl bytemuck::Zeroable for Uniforms {}
 
 
 pub struct Sandbox {
-    pub gpu_interfaces: api::GPUInterfaces,
+    pub engine_runtime : runtime::Runtime,
     render_pipeline: wgpu::RenderPipeline,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
@@ -44,11 +44,13 @@ pub struct Sandbox {
     camera_controller: graphics::camera::CameraControllerFPS,
     uniforms: Uniforms,
 }
-impl Sandbox {
-    pub async fn new(window: &Window, gpu_interfaces: api::GPUInterfaces) -> Self {
+
+impl Sandbox{
+    pub async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self {
         let size = window.inner_size();
 
         let color = 0.0;
+        let gpu_interfaces = &engine_runtime.gpu_interfaces;
 
         let camera = graphics::camera::Camera {
             // position the camera one unit up and 2 units back
@@ -183,7 +185,7 @@ impl Sandbox {
                 });
 
         Self {
-            gpu_interfaces,
+            engine_runtime,
             render_pipeline,
             camera,
             uniform_buffer,
@@ -195,19 +197,18 @@ impl Sandbox {
             uniforms,
         }
     }
-}
 
-impl Application for Sandbox {
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+    pub fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        self.engine_runtime.gpu_interfaces.resize(new_size);
         self.size = new_size;
     }
 
     // input() won't deal with GPU code, so it can be synchronous
-    fn input(&mut self, event: &WindowEvent) -> bool {
+    pub fn input(&mut self, event: &WindowEvent) -> bool {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
+    pub fn update(&mut self) {
         //not doing anything here yet
         self.camera_controller.update_camera(&mut self.camera);
         self.uniforms.update_view_proj(&self.camera);
@@ -215,13 +216,13 @@ impl Application for Sandbox {
         // Copy operation's are performed on the gpu, so we'll need
         // a CommandEncoder for that
         let mut encoder =
-            self.gpu_interfaces
+            self.engine_runtime.gpu_interfaces
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("update encoder"),
                 });
 
-        let staging_buffer = self.gpu_interfaces.device.create_buffer_with_data(
+        let staging_buffer = self.engine_runtime.gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(&[self.uniforms]),
             wgpu::BufferUsage::COPY_SRC,
         );
@@ -237,20 +238,20 @@ impl Application for Sandbox {
         // We need to remember to submit our CommandEncoder's output
         // otherwise we won't see any change.
         //self.queue.submit(&[encoder.finish()]);
-        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
+        self.engine_runtime.gpu_interfaces.queue.submit(Some(encoder.finish()));
     }
 
-    fn render(&mut self) {
+    pub fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
-            .gpu_interfaces
+            .engine_runtime.gpu_interfaces
             .swap_chain
             .get_next_texture()
             .expect("Timeout getting texture");
 
         //this is the command buffer we use to record commands
         let mut encoder =
-            self.gpu_interfaces
+            self.engine_runtime.gpu_interfaces
                 .device
                 .create_command_encoder(&wgpu::CommandEncoderDescriptor {
                     label: Some("Render Encoder"),
@@ -285,6 +286,7 @@ impl Application for Sandbox {
         //self.queue.submit(&[
         //    encoder.finish()
         //]);
-        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
+        self.engine_runtime.gpu_interfaces.queue.submit(Some(encoder.finish()));
     }
+
 }
