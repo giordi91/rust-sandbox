@@ -4,346 +4,18 @@ use winit::{
     window::{Window, WindowBuilder},
 };
 
-use rust_sandbox::engine::graphics;
-use rust_sandbox::engine::graphics::shader;
+mod sandbox;
+
+use sandbox::Sandbox;
+use rust_sandbox::engine::application::Application;
+use rust_sandbox::engine::graphics::api;
 use rust_sandbox::engine::platform;
 
-#[repr(C)] // We need this for Rust to store our data correctly for the shaders
-#[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
-struct Uniforms {
-    view_proj: cgmath::Matrix4<f32>,
-}
 
-impl Uniforms {
-    fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            view_proj: cgmath::Matrix4::identity(),
-        }
-    }
+pub async fn run<T>(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
+    let gpu_interfaces = api::GPUInterfaces::new(&window, swapchain_format).await;
 
-    fn update_view_proj(&mut self, camera: &graphics::camera::Camera) {
-        self.view_proj = camera.build_view_projection_matrix();
-    }
-}
-
-unsafe impl bytemuck::Pod for Uniforms {}
-unsafe impl bytemuck::Zeroable for Uniforms {}
-
-struct State {
-    gpu_interfaces: GPUInterfaces,
-    render_pipeline: wgpu::RenderPipeline,
-    camera: graphics::camera::Camera,
-    uniform_buffer: wgpu::Buffer,
-    uniform_bind_group: wgpu::BindGroup,
-    size: winit::dpi::PhysicalSize<u32>,
-    color: f64,
-    shader_manager: shader::ShaderManager,
-    camera_controller: graphics::camera::CameraControllerFPS,
-    uniforms: Uniforms,
-}
-impl State {
-    async fn new(window: &Window, gpu_interfaces: GPUInterfaces) -> Self {
-        let size = window.inner_size();
-
-        let color = 0.0;
-
-        let camera = graphics::camera::Camera {
-            // position the camera one unit up and 2 units back
-            // +z is out of the screen
-            eye: (3.0, 1.0, 2.0).into(),
-            // have it look at the origin
-            target: (0.0, 0.0, 0.0).into(),
-            // which way is "up"
-            up: cgmath::Vector3::unit_y(),
-            aspect: gpu_interfaces.sc_desc.width as f32 / gpu_interfaces.sc_desc.height as f32,
-            fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
-        };
-
-        let camera_controller = graphics::camera::CameraControllerFPS::new(0.02);
-
-        let mut uniforms = Uniforms::new();
-        uniforms.update_view_proj(&camera);
-
-        let uniform_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[uniforms]),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
-
-        let uniform_bind_group_layout =
-            gpu_interfaces.device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                bindings: &[wgpu::BindGroupLayoutEntry {
-                    binding: 0,
-                    visibility: wgpu::ShaderStage::VERTEX,
-                    ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                }],
-                label: Some("uniform_bind_group_layout"),
-            });
-
-        let uniform_bind_group = gpu_interfaces.device.create_bind_group(&wgpu::BindGroupDescriptor {
-            layout: &uniform_bind_group_layout,
-            bindings: &[wgpu::Binding {
-                binding: 0,
-                resource: wgpu::BindingResource::Buffer {
-                    buffer: &uniform_buffer,
-                    // FYI: you can share a single buffer between bindings.
-                    range: 0..std::mem::size_of_val(&uniforms) as wgpu::BufferAddress,
-                },
-            }],
-            label: Some("uniform_bind_group"),
-        });
-
-        let vs_module: Result<&wgpu::ShaderModule, &str>;
-        let fs_module: Result<&wgpu::ShaderModule, &str>;
-        let mut shader_manager = shader::ShaderManager::new();
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let vs_handle = shader_manager
-                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::VERTEX)
-                .await;
-            let fs_handle = shader_manager
-                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::FRAGMENT)
-                .await;
-            vs_module = shader_manager.get_shader_module(&vs_handle);
-            fs_module = shader_manager.get_shader_module(&fs_handle);
-        }
-
-        #[cfg(target_arch = "wasm32")]
-        {
-            let vs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::VERTEX)
-                .await;
-            let fs_handle = shader_manager
-                .load_shader_type(&device, "resources/shader", shader::ShaderType::FRAGMENT)
-                .await;
-            vs_module = shader_manager.get_shader_module(&vs_handle);
-            fs_module = shader_manager.get_shader_module(&fs_handle);
-        }
-
-        let render_pipeline_layout =
-            gpu_interfaces.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                bind_group_layouts: &[&uniform_bind_group_layout],
-            });
-
-        let render_pipeline = gpu_interfaces.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-            layout: &render_pipeline_layout,
-            vertex_stage: wgpu::ProgrammableStageDescriptor {
-                module: (vs_module.unwrap()),
-                entry_point: "main",
-            },
-            //frag is optional so we wrap it into an optioal
-            fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                module: (fs_module.unwrap()),
-                entry_point: "main",
-            }),
-            rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                front_face: wgpu::FrontFace::Ccw,
-                cull_mode: wgpu::CullMode::Back,
-                depth_bias: 0,
-                depth_bias_slope_scale: 0.0,
-                depth_bias_clamp: 0.0,
-            }),
-            color_states: &[wgpu::ColorStateDescriptor {
-                format: gpu_interfaces.sc_desc.format,
-                color_blend: wgpu::BlendDescriptor::REPLACE,
-                alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                write_mask: wgpu::ColorWrite::ALL,
-            }],
-            primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-            depth_stencil_state: None,
-            vertex_state: wgpu::VertexStateDescriptor {
-                index_format: wgpu::IndexFormat::Uint16,
-                vertex_buffers: &[],
-            },
-            sample_count: 1,
-            sample_mask: !0,
-            alpha_to_coverage_enabled: false,
-        });
-
-        Self {
-            gpu_interfaces,
-            render_pipeline,
-            camera,
-            uniform_buffer,
-            uniform_bind_group,
-            size,
-            color,
-            shader_manager,
-            camera_controller,
-            uniforms,
-        }
-    }
-}
-
-impl Application for State {
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
-        self.size = new_size;
-        self.gpu_interfaces.sc_desc.width = new_size.width;
-        self.gpu_interfaces.sc_desc.height = new_size.height;
-        self.gpu_interfaces.swap_chain = self
-            .gpu_interfaces
-            .device
-            .create_swap_chain(&self.gpu_interfaces.surface, &self.gpu_interfaces.sc_desc);
-    }
-
-    // input() won't deal with GPU code, so it can be synchronous
-    fn input(&mut self, event: &WindowEvent) -> bool {
-        self.camera_controller.process_events(event)
-    }
-
-    fn update(&mut self) {
-        //not doing anything here yet
-        self.camera_controller.update_camera(&mut self.camera);
-        self.uniforms.update_view_proj(&self.camera);
-
-        // Copy operation's are performed on the gpu, so we'll need
-        // a CommandEncoder for that
-        let mut encoder = self
-            .gpu_interfaces.device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("update encoder"),
-            });
-
-        let staging_buffer = self.gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[self.uniforms]),
-            wgpu::BufferUsage::COPY_SRC,
-        );
-
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer,
-            0,
-            &self.uniform_buffer,
-            0,
-            std::mem::size_of::<Uniforms>() as wgpu::BufferAddress,
-        );
-
-        // We need to remember to submit our CommandEncoder's output
-        // otherwise we won't see any change.
-        //self.queue.submit(&[encoder.finish()]);
-        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
-    }
-
-    fn render(&mut self) {
-        //first we need to get the frame we can use from the swap chain so we can render to it
-        let frame = self
-            .gpu_interfaces.swap_chain
-            .get_next_texture()
-            .expect("Timeout getting texture");
-
-        //this is the command buffer we use to record commands
-        let mut encoder = self
-            .gpu_interfaces.device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
-        {
-            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: self.color,
-                        a: 1.0,
-                    },
-                }],
-                depth_stencil_attachment: None,
-            });
-
-            render_pass.set_pipeline(&self.render_pipeline);
-            render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
-        }
-        self.color += 0.001;
-        if self.color > 1.0 {
-            self.color = 0.0;
-        }
-
-        //self.queue.submit(&[
-        //    encoder.finish()
-        //]);
-        self.gpu_interfaces.queue.submit(Some(encoder.finish()));
-    }
-}
-
-struct GPUInterfaces {
-    _instance: wgpu::Instance,
-    surface: wgpu::Surface,
-    _adapter: wgpu::Adapter,
-    device: wgpu::Device,
-    queue: wgpu::Queue,
-    sc_desc: wgpu::SwapChainDescriptor,
-    swap_chain: wgpu::SwapChain,
-}
-
-impl GPUInterfaces
-{
-    pub async fn new(window:&Window, swapchain_format: wgpu::TextureFormat ) ->Self{
-        let size = window.inner_size();
-
-        let _instance = wgpu::Instance::new();
-        let surface = unsafe { _instance.create_surface(window) };
-        let _adapter = _instance
-            .request_adapter(
-                &wgpu::RequestAdapterOptions {
-                    power_preference: wgpu::PowerPreference::Default,
-                    compatible_surface: Some(&surface),
-                },
-                wgpu::BackendBit::PRIMARY,
-            )
-            .await
-            .unwrap();
-
-        let (device, queue) = _adapter
-            .request_device(
-                &wgpu::DeviceDescriptor {
-                    extensions: wgpu::Extensions {
-                        anisotropic_filtering: true,
-                    },
-                    limits: wgpu::Limits::default(),
-                },
-                None,
-            )
-            .await
-            .unwrap();
-
-        let sc_desc = wgpu::SwapChainDescriptor {
-            usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-            format: swapchain_format,
-            width: size.width,
-            height: size.height,
-            present_mode: wgpu::PresentMode::Mailbox,
-        };
-
-        let swap_chain = device.create_swap_chain(&surface, &sc_desc);
-
-        Self
-        {
-            _instance,
-            surface,
-            _adapter,
-            device,
-            queue,
-            sc_desc,
-            swap_chain,
-        }
-
-    }
-
-
-}
-
-pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
-
-    let gpu_interfaces = GPUInterfaces::new(&window, swapchain_format).await; 
-
-    let mut state = State::new(&window, gpu_interfaces ).await;
+    let mut app = Sandbox::new(&window, gpu_interfaces).await;
 
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Poll;
@@ -354,7 +26,7 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
                 ref event,
                 window_id,
             } if window_id == window.id() => {
-                if !state.input(event) {
+                if !app.input(event) {
                     match event {
                         WindowEvent::CloseRequested => *control_flow = ControlFlow::Exit,
                         WindowEvent::KeyboardInput { input, .. } => match input {
@@ -366,19 +38,20 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
                             _ => println!("unhandled input {:?}", input),
                         },
                         WindowEvent::Resized(physical_size) => {
-                            state.resize(*physical_size);
+                            app.resize(*physical_size);
                         }
                         WindowEvent::ScaleFactorChanged { new_inner_size, .. } => {
                             // new_inner_size is &mut so w have to dereference it twice
-                            state.resize(**new_inner_size);
+                            app.gpu_interfaces.resize(**new_inner_size);
+                            app.resize(**new_inner_size);
                         }
                         _ => {}
                     }
                 }
             }
             Event::RedrawRequested(_) => {
-                state.update();
-                state.render();
+                app.update();
+                app.render();
             }
             Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually
@@ -390,13 +63,6 @@ pub async fn run(event_loop: EventLoop<()>, window: Window, swapchain_format: wg
     });
 }
 
-trait Application {
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
-    // input() won't deal with GPU code, so it can be synchronous
-    fn input(&mut self, event: &WindowEvent) -> bool;
-    fn update(&mut self);
-    fn render(&mut self);
-}
 
 fn main() {
     let event_loop = EventLoop::new();
@@ -411,7 +77,7 @@ fn main() {
         //env_logger::init();
         // Temporarily avoid srgb formats for the swapchain on the web
         // Since main can't be async, we're going to need to block
-        futures::executor::block_on(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        futures::executor::block_on(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 
     #[cfg(target_arch = "wasm32")]
@@ -428,7 +94,7 @@ fn main() {
                     .ok()
             })
             .expect("couldn't append canvas to document body");
-        wasm_bindgen_futures::spawn_local(run(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
+        wasm_bindgen_futures::spawn_local(run::<Sandbox>(event_loop, window, wgpu::TextureFormat::Bgra8Unorm));
     }
 }
 //set RUSTFLAGS=--cfg=web_sys_unstable_apis & cargo build --target wasm32-unknown-unknown && wasm-bindgen --out-dir target/generated --web target/wasm32-unknown-unknown/debug/rust-sandbox.wasm
