@@ -5,6 +5,7 @@ use rust_sandbox::engine::graphics::shader;
 use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
+use serde_json::Value;
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -76,12 +77,26 @@ impl platform::Application for Sandbox {
             graphics::bindings::load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
                 .await;
 
-        let render_pipeline_2 = graphics::bindings::load_pipeline(
+        let render_pipeline_layout =
+            gpu_interfaces
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    bind_group_layouts: &[&uniform_bind_group_layout],
+                });
+
+        let render_pipeline = graphics::bindings::load_pipeline(
             "resources/hello-triangle.pipeline",
             &mut engine_runtime.resource_managers.shader_manager,
             &engine_runtime.gpu_interfaces,
+            &uniform_bind_group_layout
         )
         .await;
+
+
+        let pipe_source = platform::file_system::load_file_string("resources/hello-triangle.pipeline").await.unwrap();
+        let pipe_content_json: Value = serde_json::from_str(&pipe_source[..]).unwrap();
+        let raster_state =  graphics::bindings::get_pipeline_raster_state(&pipe_content_json); 
+        let color_states = graphics::bindings::get_pipeline_color_states(&pipe_content_json,gpu_interfaces.sc_desc.format);
 
         platform::core::to_console("NEW!");
 
@@ -120,13 +135,8 @@ impl platform::Application for Sandbox {
         let vs_module = shader_manager.get_shader_module(&vs_handle).unwrap();
         let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
 
-        let render_pipeline_layout =
-            gpu_interfaces
-                .device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    bind_group_layouts: &[&uniform_bind_group_layout],
-                });
 
+        /*
         let render_pipeline =
             gpu_interfaces
                 .device
@@ -141,19 +151,8 @@ impl platform::Application for Sandbox {
                         module: (fs_module),
                         entry_point: "main",
                     }),
-                    rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-                        front_face: wgpu::FrontFace::Ccw,
-                        cull_mode: wgpu::CullMode::Back,
-                        depth_bias: 0,
-                        depth_bias_slope_scale: 0.0,
-                        depth_bias_clamp: 0.0,
-                    }),
-                    color_states: &[wgpu::ColorStateDescriptor {
-                        format: gpu_interfaces.sc_desc.format,
-                        color_blend: wgpu::BlendDescriptor::REPLACE,
-                        alpha_blend: wgpu::BlendDescriptor::REPLACE,
-                        write_mask: wgpu::ColorWrite::ALL,
-                    }],
+                    rasterization_state: Some(raster_state),
+                    color_states: &color_states[..],
                     primitive_topology: wgpu::PrimitiveTopology::TriangleList,
                     depth_stencil_state: None,
                     vertex_state: wgpu::VertexStateDescriptor {
@@ -164,6 +163,7 @@ impl platform::Application for Sandbox {
                     sample_mask: !0,
                     alpha_to_coverage_enabled: false,
                 });
+                */
 
         Self {
             engine_runtime,
