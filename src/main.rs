@@ -7,15 +7,14 @@ use winit::{
 mod sandbox;
 
 use sandbox::Sandbox;
-use sandbox::App;
+use sandbox::Application;
 use rust_sandbox::engine::platform;
-use rust_sandbox::engine::runtime;
 
 
-pub async fn run<T:App>(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
+pub async fn run<T:Application>(event_loop: EventLoop<()>, window: Window, swapchain_format: wgpu::TextureFormat) {
 
     //instantiating the engine innerworking and move it to the application
-    let engine_runtime = runtime::Runtime::new(&window, swapchain_format).await;
+    let engine_runtime = platform::EngineRuntime::new(&window, swapchain_format).await;
 
     let mut app = T::new(&window, engine_runtime).await;
     event_loop.run(move |event, _, control_flow| {

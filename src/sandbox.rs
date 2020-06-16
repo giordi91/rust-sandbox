@@ -4,16 +4,15 @@ use winit::{
 };
 
 use rust_sandbox::engine::graphics;
-use rust_sandbox::engine::graphics::api;
 use rust_sandbox::engine::graphics::shader;
-use rust_sandbox::engine::runtime;
+use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
 
 #[async_trait(?Send)]
-pub trait App : 'static + Sized
+pub trait Application : 'static + Sized
 {
-    async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self; 
+    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self; 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>); 
     fn input(&mut self, event: &WindowEvent) -> bool; 
     fn update(&mut self);
@@ -45,22 +44,21 @@ unsafe impl bytemuck::Zeroable for Uniforms {}
 
 
 pub struct Sandbox {
-    pub engine_runtime : runtime::Runtime,
+    pub engine_runtime : platform::EngineRuntime,
     render_pipeline: wgpu::RenderPipeline,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
-    shader_manager: shader::ShaderManager,
     camera_controller: graphics::camera::CameraControllerFPS,
     uniforms: Uniforms,
 }
 
 #[async_trait(?Send)]
-impl App for Sandbox
+impl Application for Sandbox
 {
-    async fn new(window: &Window, engine_runtime: runtime::Runtime) -> Self {
+    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self {
         let size = window.inner_size();
 
         let color = 0.0;
@@ -120,18 +118,18 @@ impl App for Sandbox
 
         let vs_module: Result<&wgpu::ShaderModule, &str>;
         let fs_module: Result<&wgpu::ShaderModule, &str>;
-        let mut shader_manager = shader::ShaderManager::new();
+        {
+        let mut shader_manager :&shader::ShaderManager= &mut engine_runtime.resource_managers.shader_manager;
         #[cfg(not(target_arch = "wasm32"))]
         {
             let vs_handle = shader_manager
-                .load_shader_type(
+            .load_shader_type(
                     &gpu_interfaces.device,
                     "resources/shader",
                     shader::ShaderType::VERTEX,
                 )
                 .await;
-            let fs_handle = shader_manager
-                .load_shader_type(
+            let fs_handle = shader_manager .load_shader_type(
                     &gpu_interfaces.device,
                     "resources/shader",
                     shader::ShaderType::FRAGMENT,
@@ -206,7 +204,6 @@ impl App for Sandbox
             uniform_bind_group,
             size,
             color,
-            shader_manager,
             camera_controller,
             uniforms,
         }

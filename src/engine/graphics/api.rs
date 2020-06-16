@@ -2,6 +2,8 @@ use winit::{
     window::Window,
 };
 
+use super::shader::ShaderManager;
+
 pub struct GPUInterfaces {
     pub _instance: wgpu::Instance,
     pub surface: wgpu::Surface,
@@ -10,6 +12,11 @@ pub struct GPUInterfaces {
     pub queue: wgpu::Queue,
     pub sc_desc: wgpu::SwapChainDescriptor,
     pub swap_chain: wgpu::SwapChain,
+}
+
+pub struct ResourceManagers
+{
+    pub shader_manager : ShaderManager,
 }
 
 impl GPUInterfaces {
@@ -67,5 +74,16 @@ impl GPUInterfaces {
         self.sc_desc.width = new_size.width;
         self.sc_desc.height = new_size.height;
         self.swap_chain = self.device.create_swap_chain(&self.surface, &self.sc_desc);
+    }
+}
+
+
+impl ResourceManagers 
+{
+    pub fn new()-> Self
+    {
+       Self{
+           shader_manager: ShaderManager::new(),
+       } 
     }
 }
