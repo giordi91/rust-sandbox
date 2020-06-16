@@ -58,7 +58,7 @@ pub struct Sandbox {
 #[async_trait(?Send)]
 impl Application for Sandbox
 {
-    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self {
+    async fn new(window: &Window, mut engine_runtime: platform::EngineRuntime) -> Self {
         let size = window.inner_size();
 
         let color = 0.0;
@@ -118,8 +118,7 @@ impl Application for Sandbox
 
         let vs_module: Result<&wgpu::ShaderModule, &str>;
         let fs_module: Result<&wgpu::ShaderModule, &str>;
-        {
-        let mut shader_manager :&shader::ShaderManager= &mut engine_runtime.resource_managers.shader_manager;
+        let shader_manager = &mut engine_runtime.resource_managers.shader_manager;
         #[cfg(not(target_arch = "wasm32"))]
         {
             let vs_handle = shader_manager
