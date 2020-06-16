@@ -1,5 +1,6 @@
 {
     "type": "raster",
+    "layout" : "hello-triangle.bg",
     "vertex": {
         "shader_name": "resources/shader"
     },
@@ -15,7 +16,7 @@
     },
     "color_states": [
         {
-            "format": "swap-chain-native",
+            "format": "swap_chain_native",
             "color_blend": "replace",
             "alpha_blend": "replace"
         }

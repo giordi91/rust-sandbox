@@ -108,43 +108,126 @@ async fn process_raster_pipeline(
     };
 
     //get frag shader if any
-    let mut fs_stage: Option<wgpu::ProgrammableStageDescriptor> = None;
+    //let mut fs_stage: Option<wgpu::ProgrammableStageDescriptor> = None;
     let fragment_value = &pipe_content_json["fragment"];
-    if !fragment_value.is_null() {
+    let fs_stage = match fragment_value.as_null() 
+    {
+        Some(()) => None,
+        _ => {
         let fragment_name = fragment_value["shader_name"].as_str().unwrap();
         let fs_handle = shader_manager
             .load_shader_type(
                 &gpu_interfaces.device,
                 fragment_name,
-                graphics::shader::ShaderType::VERTEX,
+                graphics::shader::ShaderType::FRAGMENT,
             )
             .await;
 
-        let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
-        fs_stage = Some(wgpu::ProgrammableStageDescriptor {
-            module: (fs_module),
-            entry_point: "main",
-        });
-    }
+            let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
+            Some(wgpu::ProgrammableStageDescriptor {
+                module: (fs_module),
+                entry_point: "main",
+            })
+        }
+    };
+
 
     //next is raster state
     let raster_state = get_pipeline_raster_state(&pipe_content_json);
 
-    let primitive_value = pipe_content_json["primitive_topology"].as_str().unwrap(); 
-    let primitive_topology  = match primitive_value{
+    let primitive_value = pipe_content_json["primitive_topology"].as_str().unwrap();
+    let primitive_topology = match primitive_value {
         "pointList" => wgpu::PrimitiveTopology::PointList,
         "lineList" => wgpu::PrimitiveTopology::LineList,
         "lineStrip" => wgpu::PrimitiveTopology::LineStrip,
         "triangleList" => wgpu::PrimitiveTopology::TriangleList,
         "triangleStrip" => wgpu::PrimitiveTopology::TriangleStrip,
-        _ => panic!("could not match requested primitive topology {}",primitive_value)
-    }; 
+        _ => panic!(
+            "could not match requested primitive topology {}",
+            primitive_value
+        ),
+    };
 
-    //let color_states  = get_pipeline_color
+    let color_states = get_pipeline_color_states(&pipe_content_json, gpu_interfaces.sc_desc.format);
+
+    let bg_layout = load_binding_group("resources/hello-triangle.bg", gpu_interfaces).await;
+
+    let render_pipeline_layout =
+        gpu_interfaces
+            .device
+            .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                bind_group_layouts: &[&bg_layout],
+            });
+
+
+    let render_pipeline =
+        gpu_interfaces
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                layout: &render_pipeline_layout,
+                vertex_stage: vs_stage,
+                //frag is optional so we wrap it into an optioal
+                fragment_stage: fs_stage,
+                rasterization_state: Some(raster_state),
+                color_states: &color_states[..],
+                primitive_topology: primitive_topology,
+                depth_stencil_state: None,
+                vertex_state: wgpu::VertexStateDescriptor {
+                    index_format: wgpu::IndexFormat::Uint16,
+                    vertex_buffers: &[],
+                },
+                sample_count: 1,
+                sample_mask: !0,
+                alpha_to_coverage_enabled: false,
+            });
+}
+
+fn get_pipeline_color_states(
+    pipe_content_json: &Value,
+    swap_chain_format: wgpu::TextureFormat,
+) -> Vec<wgpu::ColorStateDescriptor> {
+    let color_values = pipe_content_json["color_states"].as_array().unwrap();
+    let mut color_states = Vec::new();
+    for color_value in color_values {
+        let format = get_pipeline_color_format(color_value, swap_chain_format);
+        let color_blend = get_pipeline_blend(color_value, "color_blend");
+        let alpha_blend = get_pipeline_blend(color_value, "alpha_blend");
+
+        color_states.push(wgpu::ColorStateDescriptor {
+            format,
+            color_blend,
+            alpha_blend,
+            write_mask: wgpu::ColorWrite::ALL,
+        });
+    }
+
+    color_states
+}
+
+fn get_pipeline_blend(color_value: &Value, name: &str) -> wgpu::BlendDescriptor {
+    let blend_value = color_value[name].as_str().unwrap();
+    match blend_value {
+        "replace" => wgpu::BlendDescriptor::REPLACE,
+        _ => panic!("blend descriptor not supported yet {}", blend_value),
+    }
+}
+
+fn get_pipeline_color_format(
+    color_value: &Value,
+    swap_chain_format: wgpu::TextureFormat,
+) -> wgpu::TextureFormat {
+    let format_str = color_value["format"].as_str().unwrap();
+    match format_str {
+        "swap_chain_native" => swap_chain_format,
+        _ => panic!(
+            "unsupported swap chain format {:?}, if is a valid type add it to the function",
+            swap_chain_format
+        ),
+    }
 }
 
 fn get_pipeline_raster_state(pipe_content_json: &Value) -> wgpu::RasterizationStateDescriptor {
-    let raster_value= &pipe_content_json["rasterization_state"];
+    let raster_value = &pipe_content_json["rasterization_state"];
     let raster_type = raster_value["type"].as_str().unwrap();
     match raster_type {
         "default" => wgpu::RasterizationStateDescriptor {
@@ -187,28 +270,3 @@ fn get_raster_cull(raster_value: &Value) -> wgpu::CullMode {
         _ => panic!("could not match requested cull facing value {}", cull_str),
     }
 }
-
-/*
-rasterization_state: Some(wgpu::RasterizationStateDescriptor {
-    front_face: wgpu::FrontFace::Ccw,
-    cull_mode: wgpu::CullMode::Back,
-    depth_bias: 0,
-    depth_bias_slope_scale: 0.0,
-    depth_bias_clamp: 0.0,
-}),
-color_states: &[wgpu::ColorStateDescriptor {
-    format: gpu_interfaces.sc_desc.format,
-    color_blend: wgpu::BlendDescriptor::REPLACE,
-    alpha_blend: wgpu::BlendDescriptor::REPLACE,
-    write_mask: wgpu::ColorWrite::ALL,
-}],
-primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-depth_stencil_state: None,
-vertex_state: wgpu::VertexStateDescriptor {
-    index_format: wgpu::IndexFormat::Uint16,
-    vertex_buffers: &[],
-},
-sample_count: 1,
-sample_mask: !0,
-alpha_to_coverage_enabled: false,
-*/
