@@ -6,7 +6,10 @@
 #[cfg(not(target_arch = "wasm32"))] pub use native::*;
 
 //imports
-use winit::window::Window;
+use winit::{event::*, window::Window};
+use async_trait::async_trait;
+
+use super::graphics::api;
 
 #[derive(Debug)]
 pub enum Platform
@@ -15,12 +18,20 @@ pub enum Platform
     BROWSER,
 }
 
-use super::graphics::api;
-
 pub struct EngineRuntime {
     pub gpu_interfaces: api::GPUInterfaces,
     pub resource_managers: api::ResourceManagers,
 }
+
+#[async_trait(?Send)]
+pub trait Application: 'static + Sized {
+    async fn new(window: &Window, engine_runtime: EngineRuntime) -> Self;
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
+    fn input(&mut self, event: &WindowEvent) -> bool;
+    fn update(&mut self);
+    fn render(&mut self);
+}
+
 
 impl EngineRuntime {
     pub async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {

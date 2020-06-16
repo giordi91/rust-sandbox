@@ -3,19 +3,8 @@ use winit::{event::*, window::Window};
 use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::graphics::shader;
 use rust_sandbox::engine::platform;
-use rust_sandbox::engine::platform::file_system;
 
 use async_trait::async_trait;
-use serde_json::{Result, Value};
-
-#[async_trait(?Send)]
-pub trait Application: 'static + Sized {
-    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self;
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
-    fn input(&mut self, event: &WindowEvent) -> bool;
-    fn update(&mut self);
-    fn render(&mut self);
-}
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -51,73 +40,8 @@ pub struct Sandbox {
     uniforms: Uniforms,
 }
 
-pub fn get_bind_group_visibility(visiblities: &Vec<Value>) -> wgpu::ShaderStage {
-    let mut out_vis = wgpu::ShaderStage::NONE;
-    for visibility in visiblities {
-        let visibility_str = visibility.as_str().unwrap();
-        out_vis |= match visibility_str {
-            "vertex" => wgpu::ShaderStage::VERTEX,
-            "fragment" => wgpu::ShaderStage::FRAGMENT,
-            "compute" => wgpu::ShaderStage::COMPUTE,
-            _ => panic!("Unknown wgpu shader statage {}", visibility_str),
-        };
-    }
-
-    //returning built visibility field
-    out_vis
-}
-
-pub fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
-    match type_str {
-        //if is a uniform , we extract some extra data and return the built type
-        "uniform" => wgpu::BindingType::UniformBuffer {
-            dynamic: binding["dynamic"].as_bool().unwrap(),
-        },
-        _ => panic!("Unexpected binding group type {}", type_str),
-    }
-}
-
-pub async fn load_binding_group(
-    file_name: &str,
-    gpu_interfaces: &graphics::api::GPUInterfaces,
-) -> wgpu::BindGroupLayout {
-    let bg_source = file_system::load_file_string(file_name).await.unwrap();
-    let bg_content_js: Value = serde_json::from_str(&bg_source[..]).unwrap();
-    let bindings_values = &bg_content_js["bindings"].as_array().unwrap();
-
-    let mut bindings = Vec::new();
-    for binding in *bindings_values {
-        let slot = binding["slot"].as_u64().unwrap() as u32;
-        let visibility_array = binding["visibility"].as_array().unwrap();
-        let visibility_bitfiled = get_bind_group_visibility(visibility_array);
-        let type_value = binding["type"].as_str().unwrap();
-        let binding_type = get_bind_group_type(type_value, binding);
-
-        bindings.push(wgpu::BindGroupLayoutEntry {
-            binding: slot,
-            visibility: visibility_bitfiled,
-            ty: binding_type,
-        })
-    }
-
-    //oh wow... all this to get the string
-    let file_name_no_ext = std::path::Path::new(file_name)
-        .file_stem()
-        .unwrap()
-        .to_str()
-        .unwrap();
-    let bind_group_layout =
-        gpu_interfaces
-            .device
-            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                bindings: &bindings[..],
-                label: Some(&format!("{}_bg", file_name_no_ext)[..]),
-            });
-    bind_group_layout
-}
-
 #[async_trait(?Send)]
-impl Application for Sandbox {
+impl platform::Application for Sandbox {
     async fn new(window: &Window, mut engine_runtime: platform::EngineRuntime) -> Self {
         let size = window.inner_size();
 
@@ -149,7 +73,15 @@ impl Application for Sandbox {
         );
 
         let uniform_bind_group_layout =
-            load_binding_group("resources/hello-triangle.bg", gpu_interfaces).await;
+            graphics::bindings::load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
+                .await;
+
+        let render_pipeline_2 = graphics::bindings::load_pipeline(
+            "resources/hello-triangle.pipeline",
+            &mut engine_runtime.resource_managers.shader_manager,
+            &engine_runtime.gpu_interfaces,
+        )
+        .await;
 
         platform::core::to_console("NEW!");
 

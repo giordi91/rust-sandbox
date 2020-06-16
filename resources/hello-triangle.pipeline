@@ -1,0 +1,23 @@
+{
+    "type": "raster",
+    "vertex": {
+        "shader_name": "resources/shader"
+    },
+    "fragment": {
+        "shader_name": "resources/shader"
+    },
+    "rasterization_state": {
+        "type": "default"
+    },
+    "primitive_topology": "triangleList",
+    "vertex_state": {
+        "index_format": "uint16"
+    },
+    "color_states": [
+        {
+            "format": "swap-chain-native",
+            "color_blend": "replace",
+            "alpha_blend": "replace"
+        }
+    ]
+}
