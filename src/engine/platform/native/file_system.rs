@@ -5,7 +5,7 @@ pub async fn load_file_u8(file_name: &String) -> Result<Vec<u8>, io::Error> {
     fs::read(file_name)
 }
 
-pub async fn load_file_string(file_name: &String) -> Result<String, io::Error> {
+pub async fn load_file_string(file_name: &str) -> Result<String, io::Error> {
     fs::read_to_string(file_name)
 }
 

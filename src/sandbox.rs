@@ -1,24 +1,21 @@
-use winit::{
-    event::*,
-    window::Window,
-};
+use winit::{event::*, window::Window};
 
 use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::graphics::shader;
 use rust_sandbox::engine::platform;
+use rust_sandbox::engine::platform::file_system;
 
 use async_trait::async_trait;
+use serde_json::{Result, Value};
 
 #[async_trait(?Send)]
-pub trait Application : 'static + Sized
-{
-    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self; 
-    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>); 
-    fn input(&mut self, event: &WindowEvent) -> bool; 
+pub trait Application: 'static + Sized {
+    async fn new(window: &Window, engine_runtime: platform::EngineRuntime) -> Self;
+    fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
+    fn input(&mut self, event: &WindowEvent) -> bool;
     fn update(&mut self);
-    fn render(&mut self); 
+    fn render(&mut self);
 }
-
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -42,9 +39,8 @@ impl Uniforms {
 unsafe impl bytemuck::Pod for Uniforms {}
 unsafe impl bytemuck::Zeroable for Uniforms {}
 
-
 pub struct Sandbox {
-    pub engine_runtime : platform::EngineRuntime,
+    pub engine_runtime: platform::EngineRuntime,
     render_pipeline: wgpu::RenderPipeline,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
@@ -55,9 +51,73 @@ pub struct Sandbox {
     uniforms: Uniforms,
 }
 
+pub fn get_bind_group_visibility(visiblities: &Vec<Value>) -> wgpu::ShaderStage {
+    let mut out_vis = wgpu::ShaderStage::NONE;
+    for visibility in visiblities {
+        let visibility_str = visibility.as_str().unwrap();
+        out_vis |= match visibility_str {
+            "vertex" => wgpu::ShaderStage::VERTEX,
+            "fragment" => wgpu::ShaderStage::FRAGMENT,
+            "compute" => wgpu::ShaderStage::COMPUTE,
+            _ => panic!("Unknown wgpu shader statage {}", visibility_str),
+        };
+    }
+
+    //returning built visibility field
+    out_vis
+}
+
+pub fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
+    match type_str {
+        //if is a uniform , we extract some extra data and return the built type
+        "uniform" => wgpu::BindingType::UniformBuffer {
+            dynamic: binding["dynamic"].as_bool().unwrap(),
+        },
+        _ => panic!("Unexpected binding group type {}", type_str),
+    }
+}
+
+pub async fn load_binding_group(
+    file_name: &str,
+    gpu_interfaces: &graphics::api::GPUInterfaces,
+) -> wgpu::BindGroupLayout {
+    let bg_source = file_system::load_file_string(file_name).await.unwrap();
+    let bg_content_js: Value = serde_json::from_str(&bg_source[..]).unwrap();
+    let bindings_values = &bg_content_js["bindings"].as_array().unwrap();
+
+    let mut bindings = Vec::new();
+    for binding in *bindings_values {
+        let slot = binding["slot"].as_u64().unwrap() as u32;
+        let visibility_array = binding["visibility"].as_array().unwrap();
+        let visibility_bitfiled = get_bind_group_visibility(visibility_array);
+        let type_value = binding["type"].as_str().unwrap();
+        let binding_type = get_bind_group_type(type_value, binding);
+
+        bindings.push(wgpu::BindGroupLayoutEntry {
+            binding: slot,
+            visibility: visibility_bitfiled,
+            ty: binding_type,
+        })
+    }
+
+    //oh wow... all this to get the string
+    let file_name_no_ext = std::path::Path::new(file_name)
+        .file_stem()
+        .unwrap()
+        .to_str()
+        .unwrap();
+    let bind_group_layout =
+        gpu_interfaces
+            .device
+            .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                bindings: &bindings[..],
+                label: Some(&format!("{}_bg", file_name_no_ext)[..]),
+            });
+    bind_group_layout
+}
+
 #[async_trait(?Send)]
-impl Application for Sandbox
-{
+impl Application for Sandbox {
     async fn new(window: &Window, mut engine_runtime: platform::EngineRuntime) -> Self {
         let size = window.inner_size();
 
@@ -89,16 +149,9 @@ impl Application for Sandbox
         );
 
         let uniform_bind_group_layout =
-            gpu_interfaces
-                .device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    bindings: &[wgpu::BindGroupLayoutEntry {
-                        binding: 0,
-                        visibility: wgpu::ShaderStage::VERTEX,
-                        ty: wgpu::BindingType::UniformBuffer { dynamic: false },
-                    }],
-                    label: Some("uniform_bind_group_layout"),
-                });
+            load_binding_group("resources/hello-triangle.bg", gpu_interfaces).await;
+
+        platform::core::to_console("NEW!");
 
         let uniform_bind_group =
             gpu_interfaces
@@ -116,39 +169,24 @@ impl Application for Sandbox
                     label: Some("uniform_bind_group"),
                 });
 
-        let vs_module: Result<&wgpu::ShaderModule, &str>;
-        let fs_module: Result<&wgpu::ShaderModule, &str>;
         let shader_manager = &mut engine_runtime.resource_managers.shader_manager;
-        #[cfg(not(target_arch = "wasm32"))]
-        {
-            let vs_handle = shader_manager
+        let vs_handle = shader_manager
             .load_shader_type(
-                    &gpu_interfaces.device,
-                    "resources/shader",
-                    shader::ShaderType::VERTEX,
-                )
-                .await;
-            let fs_handle = shader_manager .load_shader_type(
-                    &gpu_interfaces.device,
-                    "resources/shader",
-                    shader::ShaderType::FRAGMENT,
-                )
-                .await;
-            vs_module = shader_manager.get_shader_module(&vs_handle);
-            fs_module = shader_manager.get_shader_module(&fs_handle);
-        }
+                &gpu_interfaces.device,
+                "resources/shader",
+                shader::ShaderType::VERTEX,
+            )
+            .await;
+        let fs_handle = shader_manager
+            .load_shader_type(
+                &gpu_interfaces.device,
+                "resources/shader",
+                shader::ShaderType::FRAGMENT,
+            )
+            .await;
 
-        #[cfg(target_arch = "wasm32")]
-        {
-            let vs_handle = shader_manager
-                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::VERTEX)
-                .await;
-            let fs_handle = shader_manager
-                .load_shader_type(&gpu_interfaces.device, "resources/shader", shader::ShaderType::FRAGMENT)
-                .await;
-            vs_module = shader_manager.get_shader_module(&vs_handle);
-            fs_module = shader_manager.get_shader_module(&fs_handle);
-        }
+        let vs_module = shader_manager.get_shader_module(&vs_handle).unwrap();
+        let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
 
         let render_pipeline_layout =
             gpu_interfaces
@@ -163,12 +201,12 @@ impl Application for Sandbox
                 .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
                     layout: &render_pipeline_layout,
                     vertex_stage: wgpu::ProgrammableStageDescriptor {
-                        module: (vs_module.unwrap()),
+                        module: (vs_module),
                         entry_point: "main",
                     },
                     //frag is optional so we wrap it into an optioal
                     fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                        module: (fs_module.unwrap()),
+                        module: (fs_module),
                         entry_point: "main",
                     }),
                     rasterization_state: Some(wgpu::RasterizationStateDescriptor {
@@ -225,17 +263,22 @@ impl Application for Sandbox
 
         // Copy operation's are performed on the gpu, so we'll need
         // a CommandEncoder for that
-        let mut encoder =
-            self.engine_runtime.gpu_interfaces
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("update encoder"),
-                });
+        let mut encoder = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("update encoder"),
+            });
 
-        let staging_buffer = self.engine_runtime.gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[self.uniforms]),
-            wgpu::BufferUsage::COPY_SRC,
-        );
+        let staging_buffer = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_buffer_with_data(
+                bytemuck::cast_slice(&[self.uniforms]),
+                wgpu::BufferUsage::COPY_SRC,
+            );
 
         encoder.copy_buffer_to_buffer(
             &staging_buffer,
@@ -248,24 +291,29 @@ impl Application for Sandbox
         // We need to remember to submit our CommandEncoder's output
         // otherwise we won't see any change.
         //self.queue.submit(&[encoder.finish()]);
-        self.engine_runtime.gpu_interfaces.queue.submit(Some(encoder.finish()));
+        self.engine_runtime
+            .gpu_interfaces
+            .queue
+            .submit(Some(encoder.finish()));
     }
 
     fn render(&mut self) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
-            .engine_runtime.gpu_interfaces
+            .engine_runtime
+            .gpu_interfaces
             .swap_chain
             .get_next_texture()
             .expect("Timeout getting texture");
 
         //this is the command buffer we use to record commands
-        let mut encoder =
-            self.engine_runtime.gpu_interfaces
-                .device
-                .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                    label: Some("Render Encoder"),
-                });
+        let mut encoder = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("Render Encoder"),
+            });
 
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -296,7 +344,9 @@ impl Application for Sandbox
         //self.queue.submit(&[
         //    encoder.finish()
         //]);
-        self.engine_runtime.gpu_interfaces.queue.submit(Some(encoder.finish()));
+        self.engine_runtime
+            .gpu_interfaces
+            .queue
+            .submit(Some(encoder.finish()));
     }
-
 }

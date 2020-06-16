@@ -32,7 +32,7 @@ pub async fn load_file_u8(url : &String) -> Result<Vec<u8>, JsValue> {
     Ok(body)
 }
 
-pub async fn load_file_string(url : &String) -> Result<String, JsValue> {
+pub async fn load_file_string(url : &str) -> Result<String, JsValue> {
     let mut opts = RequestInit::new();
     opts.method("GET");
     opts.mode(RequestMode::Cors);
