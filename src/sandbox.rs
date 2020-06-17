@@ -110,7 +110,7 @@ impl platform::Application for Sandbox {
             gpu_interfaces.sc_desc.format,
         );
 
-        platform::core::to_console("NEW!");
+        platform::core::to_console("NEW2!");
 
         let bg_layout = engine_runtime
             .resource_managers
