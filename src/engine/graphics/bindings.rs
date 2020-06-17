@@ -62,7 +62,7 @@ impl PipelineManager {
             .insert(String::from(file_name), self.handle_counter);
 
         handle::ResourceHandle::new(
-            handle::ResourceHandleType::RENDER_PIPELINE,
+            handle::ResourceHandleType::RenderPipeline,
             self.handle_counter,
         )
 
@@ -143,7 +143,7 @@ impl PipelineManager {
             .insert(String::from(file_name), self.handle_counter);
 
         handle::ResourceHandle::new(
-            handle::ResourceHandleType::BINDING_GROUP,
+            handle::ResourceHandleType::BindingGroup,
             self.handle_counter,
         )
     }

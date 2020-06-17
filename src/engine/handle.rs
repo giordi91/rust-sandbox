@@ -1,12 +1,12 @@
 #[repr(u8)]
 #[derive(PartialEq, Debug)]
 pub enum ResourceHandleType {
-    SHADER = 1,
-    TEXTURE = 2,
-    MESH = 3,
-    BINDING_GROUP = 4,
-    RENDER_PIPELINE = 5,
-    INVALID = !0,
+    Shader = 1,
+    Texture= 2,
+    Mesh = 3,
+    BindingGroup= 4,
+    RenderPipeline= 5,
+    Invalid = !0,
 }
 
 const HANDLE_TYPE_BIT_COUNT: u64 = 10;

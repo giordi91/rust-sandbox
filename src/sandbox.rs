@@ -5,7 +5,6 @@ use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
-use serde_json::Value;
 
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
@@ -79,15 +78,6 @@ impl platform::Application for Sandbox {
             .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
             .await;
 
-        /*
-        let render_pipeline_layout =
-            gpu_interfaces
-                .device
-                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    bind_group_layouts: &[&bg_layout.unwrap()],
-                });
-                */
-
         let render_pipeline_handle = engine_runtime
             .resource_managers
             .pipeline_manager
@@ -98,17 +88,6 @@ impl platform::Application for Sandbox {
                 //&uniform_bind_group_layout,
             )
             .await;
-
-        let pipe_source =
-            platform::file_system::load_file_string("resources/hello-triangle.pipeline")
-                .await
-                .unwrap();
-        let pipe_content_json: Value = serde_json::from_str(&pipe_source[..]).unwrap();
-        let raster_state = graphics::bindings::get_pipeline_raster_state(&pipe_content_json);
-        let color_states = graphics::bindings::get_pipeline_color_states(
-            &pipe_content_json,
-            gpu_interfaces.sc_desc.format,
-        );
 
         platform::core::to_console("NEW2!");
 
@@ -133,55 +112,6 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
-        /*
-        let shader_manager = &mut engine_runtime.resource_managers.shader_manager;
-        let vs_handle = shader_manager
-            .load_shader_type(
-                &gpu_interfaces.device,
-                "resources/shader",
-                shader::ShaderType::VERTEX,
-            )
-            .await;
-        let fs_handle = shader_manager
-            .load_shader_type(
-                &gpu_interfaces.device,
-                "resources/shader",
-                shader::ShaderType::FRAGMENT,
-            )
-            .await;
-
-        let vs_module = shader_manager.get_shader_module(&vs_handle).unwrap();
-        let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
-        */
-
-        /*
-        let render_pipeline =
-            gpu_interfaces
-                .device
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    layout: &render_pipeline_layout,
-                    vertex_stage: wgpu::ProgrammableStageDescriptor {
-                        module: (vs_module),
-                        entry_point: "main",
-                    },
-                    //frag is optional so we wrap it into an optioal
-                    fragment_stage: Some(wgpu::ProgrammableStageDescriptor {
-                        module: (fs_module),
-                        entry_point: "main",
-                    }),
-                    rasterization_state: Some(raster_state),
-                    color_states: &color_states[..],
-                    primitive_topology: wgpu::PrimitiveTopology::TriangleList,
-                    depth_stencil_state: None,
-                    vertex_state: wgpu::VertexStateDescriptor {
-                        index_format: wgpu::IndexFormat::Uint16,
-                        vertex_buffers: &[],
-                    },
-                    sample_count: 1,
-                    sample_mask: !0,
-                    alpha_to_coverage_enabled: false,
-                });
-                */
 
         Self {
             engine_runtime,

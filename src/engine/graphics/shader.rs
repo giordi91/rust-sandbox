@@ -76,7 +76,7 @@ impl ShaderManager {
         self.shader_counter += 1;
         self.shader_mapper.insert(self.shader_counter, shader);
 
-        handle::ResourceHandle::new(handle::ResourceHandleType::SHADER, self.shader_counter)
+        handle::ResourceHandle::new(handle::ResourceHandleType::Shader, self.shader_counter)
     }
 
     //TODO investigate should pass the hande by value? will it get trivially copied?
