@@ -3,6 +3,7 @@ use winit::{
 };
 
 use super::shader::ShaderManager;
+use super::bindings::PipelineManager;
 
 pub struct GPUInterfaces {
     pub _instance: wgpu::Instance,
@@ -17,6 +18,7 @@ pub struct GPUInterfaces {
 pub struct ResourceManagers
 {
     pub shader_manager : ShaderManager,
+    pub pipeline_manager : PipelineManager, 
 }
 
 impl GPUInterfaces {
@@ -84,6 +86,7 @@ impl ResourceManagers
     {
        Self{
            shader_manager: ShaderManager::new(),
+           pipeline_manager: PipelineManager::new(),
        } 
     }
 }

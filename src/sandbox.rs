@@ -1,7 +1,7 @@
 use winit::{event::*, window::Window};
 
 use rust_sandbox::engine::graphics;
-use rust_sandbox::engine::graphics::shader;
+use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
@@ -31,7 +31,7 @@ unsafe impl bytemuck::Zeroable for Uniforms {}
 
 pub struct Sandbox {
     pub engine_runtime: platform::EngineRuntime,
-    render_pipeline: wgpu::RenderPipeline,
+    render_pipeline_handle: handle::ResourceHandle,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
@@ -73,38 +73,55 @@ impl platform::Application for Sandbox {
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
-        let uniform_bind_group_layout =
-            graphics::bindings::load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
-                .await;
+        let layout_handle = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
+            .await;
 
+        /*
         let render_pipeline_layout =
             gpu_interfaces
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    bind_group_layouts: &[&uniform_bind_group_layout],
+                    bind_group_layouts: &[&bg_layout.unwrap()],
                 });
+                */
 
-        let render_pipeline = graphics::bindings::load_pipeline(
-            "resources/hello-triangle.pipeline",
-            &mut engine_runtime.resource_managers.shader_manager,
-            &engine_runtime.gpu_interfaces,
-            &uniform_bind_group_layout
-        )
-        .await;
+        let render_pipeline_handle = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_pipeline(
+                "resources/hello-triangle.pipeline",
+                &mut engine_runtime.resource_managers.shader_manager,
+                &engine_runtime.gpu_interfaces,
+                //&uniform_bind_group_layout,
+            )
+            .await;
 
-
-        let pipe_source = platform::file_system::load_file_string("resources/hello-triangle.pipeline").await.unwrap();
+        let pipe_source =
+            platform::file_system::load_file_string("resources/hello-triangle.pipeline")
+                .await
+                .unwrap();
         let pipe_content_json: Value = serde_json::from_str(&pipe_source[..]).unwrap();
-        let raster_state =  graphics::bindings::get_pipeline_raster_state(&pipe_content_json); 
-        let color_states = graphics::bindings::get_pipeline_color_states(&pipe_content_json,gpu_interfaces.sc_desc.format);
+        let raster_state = graphics::bindings::get_pipeline_raster_state(&pipe_content_json);
+        let color_states = graphics::bindings::get_pipeline_color_states(
+            &pipe_content_json,
+            gpu_interfaces.sc_desc.format,
+        );
 
         platform::core::to_console("NEW!");
+
+        let bg_layout = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(layout_handle);
 
         let uniform_bind_group =
             gpu_interfaces
                 .device
                 .create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &uniform_bind_group_layout,
+                    layout: &bg_layout.unwrap(),
                     bindings: &[wgpu::Binding {
                         binding: 0,
                         resource: wgpu::BindingResource::Buffer {
@@ -116,6 +133,7 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
+        /*
         let shader_manager = &mut engine_runtime.resource_managers.shader_manager;
         let vs_handle = shader_manager
             .load_shader_type(
@@ -134,7 +152,7 @@ impl platform::Application for Sandbox {
 
         let vs_module = shader_manager.get_shader_module(&vs_handle).unwrap();
         let fs_module = shader_manager.get_shader_module(&fs_handle).unwrap();
-
+        */
 
         /*
         let render_pipeline =
@@ -167,7 +185,7 @@ impl platform::Application for Sandbox {
 
         Self {
             engine_runtime,
-            render_pipeline,
+            render_pipeline_handle,
             camera,
             uniform_buffer,
             uniform_bind_group,
@@ -264,7 +282,12 @@ impl platform::Application for Sandbox {
                 depth_stencil_attachment: None,
             });
 
-            render_pass.set_pipeline(&self.render_pipeline);
+            let render_pipeline = self
+                .engine_runtime
+                .resource_managers
+                .pipeline_manager
+                .get_pipeline_from_handle(&self.render_pipeline_handle);
+            render_pass.set_pipeline(&render_pipeline.unwrap());
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
             render_pass.draw(0..3, 0..1);
         }

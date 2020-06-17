@@ -4,6 +4,8 @@ pub enum ResourceHandleType {
     SHADER = 1,
     TEXTURE = 2,
     MESH = 3,
+    BINDING_GROUP = 4,
+    RENDER_PIPELINE = 5,
     INVALID = !0,
 }
 
@@ -24,9 +26,12 @@ impl ResourceHandle {
             data: (handle_bits | value),
         }
     }
+    pub fn from_data(data: u64) -> Self {
+        Self { data }
+    }
 
     pub fn get_type(&self) -> ResourceHandleType {
-        let handle_type_bits = (self.data & HANDLE_TYPE_MASK_FLAG )>> (64 - HANDLE_TYPE_BIT_COUNT);
+        let handle_type_bits = (self.data & HANDLE_TYPE_MASK_FLAG) >> (64 - HANDLE_TYPE_BIT_COUNT);
         let handle_type_u8 = handle_type_bits as u8;
         let handle_type: ResourceHandleType = unsafe { std::mem::transmute(handle_type_u8) };
         handle_type
@@ -35,5 +40,7 @@ impl ResourceHandle {
         self.data & (!HANDLE_TYPE_MASK_FLAG)
     }
 
-    pub fn raw(&self)->u64{ self.data}
+    pub fn raw(&self) -> u64 {
+        self.data
+    }
 }
