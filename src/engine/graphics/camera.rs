@@ -28,6 +28,7 @@ impl Camera {
 
 
 
+/*
 pub struct CameraTrackBall {
     speed: f32,
     is_up_pressed: bool,
@@ -38,7 +39,6 @@ pub struct CameraTrackBall {
     is_right_pressed: bool,
 }
 
-/*
 trait CameraController{
     fn process_events(&mut self, event: &WindowEvent) -> bool; 
     fn update_camera(&self, camera: &mut Camera); 
