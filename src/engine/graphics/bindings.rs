@@ -122,6 +122,7 @@ impl PipelineManager {
             })
         }
 
+
         //oh wow... all this to get the string
         let file_name_no_ext = std::path::Path::new(file_name)
             .file_stem()
