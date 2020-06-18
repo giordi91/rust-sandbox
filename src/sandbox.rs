@@ -6,30 +6,8 @@ use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
 
-#[repr(C)] // We need this for Rust to store our data correctly for the shaders
-#[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
-pub struct Uniforms {
-    view_proj: cgmath::Matrix4<f32>,
-}
-
-impl Uniforms {
-    pub fn new() -> Self {
-        use cgmath::SquareMatrix;
-        Self {
-            view_proj: cgmath::Matrix4::identity(),
-        }
-    }
-
-    pub fn update_view_proj(&mut self, camera: &graphics::camera::Camera) {
-        self.view_proj = camera.build_view_projection_matrix();
-    }
-}
-
-unsafe impl bytemuck::Pod for Uniforms {}
-unsafe impl bytemuck::Zeroable for Uniforms {}
-
 pub struct Sandbox {
-    pub engine_runtime: platform::EngineRuntime,
+    engine_runtime: platform::EngineRuntime,
     render_pipeline_handle: handle::ResourceHandle,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
@@ -37,7 +15,7 @@ pub struct Sandbox {
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
     camera_controller: graphics::camera::CameraControllerFPS,
-    uniforms: Uniforms,
+    per_frame_data: graphics::FrameData,
     time_stamp: u64,
     delta_time: u64
 }
@@ -66,11 +44,11 @@ impl platform::Application for Sandbox {
 
         let camera_controller = graphics::camera::CameraControllerFPS::new(10.0);
 
-        let mut uniforms = Uniforms::new();
-        uniforms.update_view_proj(&camera);
+        let mut per_frame_data = graphics::FrameData::new();
+        per_frame_data.update_view_proj(&camera);
 
         let uniform_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[uniforms]),
+            bytemuck::cast_slice(&[per_frame_data]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
@@ -108,7 +86,7 @@ impl platform::Application for Sandbox {
                         resource: wgpu::BindingResource::Buffer {
                             buffer: &uniform_buffer,
                             // FYI: you can share a single buffer between bindings.
-                            range: 0..std::mem::size_of_val(&uniforms) as wgpu::BufferAddress,
+                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
                         },
                     }],
                     label: Some("uniform_bind_group"),
@@ -124,7 +102,7 @@ impl platform::Application for Sandbox {
             size,
             color,
             camera_controller,
-            uniforms,
+            per_frame_data,
             time_stamp:platform::core::get_time_in_micro(),
             delta_time: 0,
         }
@@ -148,7 +126,7 @@ impl platform::Application for Sandbox {
 
         //not doing anything here yet
         self.camera_controller.update_camera(&mut self.camera, self.delta_time);
-        self.uniforms.update_view_proj(&self.camera);
+        self.per_frame_data.update_view_proj(&self.camera);
 
         // Copy operation's are performed on the gpu, so we'll need
         // a CommandEncoder for that
@@ -165,7 +143,7 @@ impl platform::Application for Sandbox {
             .gpu_interfaces
             .device
             .create_buffer_with_data(
-                bytemuck::cast_slice(&[self.uniforms]),
+                bytemuck::cast_slice(&[self.per_frame_data]),
                 wgpu::BufferUsage::COPY_SRC,
             );
 
@@ -174,7 +152,7 @@ impl platform::Application for Sandbox {
             0,
             &self.uniform_buffer,
             0,
-            std::mem::size_of::<Uniforms>() as wgpu::BufferAddress,
+            std::mem::size_of::<graphics::FrameData>() as wgpu::BufferAddress,
         );
 
         // We need to remember to submit our CommandEncoder's output

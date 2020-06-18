@@ -101,7 +101,6 @@ impl CameraControllerFPS {
 
         let delta_float = ((delta_time as f64) * 1e-6) as f32;
         use cgmath::InnerSpace;
-        platform::core::to_console(&format!("{}",delta_float)[..]);
         let forward = (camera.target - camera.eye).normalize();
 
         if self.is_forward_pressed {
