@@ -4,7 +4,7 @@ use super::super::platform;
 use super::super::platform::file_system;
 use super::super::handle;
 
-const SPIRV_EXT: &'static str = ".spv";
+const SPIRV_EXT: &str = ".spv";
 pub enum ShaderType {
     VERTEX,
     FRAGMENT,
@@ -16,19 +16,13 @@ pub struct Shader {
     pub module: wgpu::ShaderModule,
 }
 
+#[derive(Default)]
 pub struct ShaderManager {
     shader_mapper: HashMap<u64, Shader>,
     shader_counter: u64,
 }
 
 impl ShaderManager {
-    pub fn new() -> Self {
-        let shader_mapper: HashMap<u64, Shader> = HashMap::new();
-        Self {
-            shader_mapper,
-            shader_counter: 0,
-        }
-    }
 
     pub async fn load_shader_type(
         &mut self,

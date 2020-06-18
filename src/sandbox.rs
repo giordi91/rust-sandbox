@@ -38,6 +38,8 @@ pub struct Sandbox {
     color: f64,
     camera_controller: graphics::camera::CameraControllerFPS,
     uniforms: Uniforms,
+    time_stamp: u64,
+    delta_time: u64
 }
 
 #[async_trait(?Send)]
@@ -62,7 +64,7 @@ impl platform::Application for Sandbox {
             zfar: 100.0,
         };
 
-        let camera_controller = graphics::camera::CameraControllerFPS::new(0.02);
+        let camera_controller = graphics::camera::CameraControllerFPS::new(10.0);
 
         let mut uniforms = Uniforms::new();
         uniforms.update_view_proj(&camera);
@@ -123,6 +125,8 @@ impl platform::Application for Sandbox {
             color,
             camera_controller,
             uniforms,
+            time_stamp:platform::core::get_time_in_micro(),
+            delta_time: 0,
         }
     }
 
@@ -137,8 +141,13 @@ impl platform::Application for Sandbox {
     }
 
     fn update(&mut self) {
+        //let us update time
+        let curr_time = platform::core::get_time_in_micro();
+        self.delta_time = curr_time - self.time_stamp;
+        self.time_stamp = curr_time;
+
         //not doing anything here yet
-        self.camera_controller.update_camera(&mut self.camera);
+        self.camera_controller.update_camera(&mut self.camera, self.delta_time);
         self.uniforms.update_view_proj(&self.camera);
 
         // Copy operation's are performed on the gpu, so we'll need

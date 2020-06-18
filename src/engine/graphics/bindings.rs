@@ -3,9 +3,9 @@ use std::collections::HashMap;
 
 use super::super::handle;
 use crate::engine::graphics;
-use crate::engine::platform;
 use crate::engine::platform::file_system;
 
+#[derive(Default)]
 pub struct PipelineManager {
     bg_mapper: HashMap<u64, wgpu::BindGroupLayout>,
     bg_path_mapper: HashMap<String, u64>,
@@ -13,17 +13,8 @@ pub struct PipelineManager {
     pipe_path_mapper: HashMap<String, u64>,
     handle_counter: u64,
 }
-impl PipelineManager {
-    pub fn new() -> Self {
-        Self {
-            bg_mapper: HashMap::new(),
-            bg_path_mapper: HashMap::new(),
-            pipe_mapper: HashMap::new(),
-            pipe_path_mapper: HashMap::new(),
-            handle_counter: 0,
-        }
-    }
 
+impl PipelineManager {
     pub async fn load_pipeline(
         &mut self,
         file_name: &str,
@@ -31,8 +22,6 @@ impl PipelineManager {
         gpu_interfaces: &graphics::api::GPUInterfaces,
         //layout: &wgpu::BindGroupLayout,
     ) -> handle::ResourceHandle {
-
-
         let loaded = self.pipe_path_mapper.contains_key(file_name);
         if loaded {
             return handle::ResourceHandle::from_data(self.pipe_path_mapper[file_name]);
@@ -48,9 +37,9 @@ impl PipelineManager {
                     pipe_content_json,
                     shader_manager,
                     gpu_interfaces,
-         //           layout,
+                    //           layout,
                 )
-                .await
+                    .await
             }
             _ => panic!(),
         };
@@ -65,13 +54,11 @@ impl PipelineManager {
             handle::ResourceHandleType::RenderPipeline,
             self.handle_counter,
         )
-
     }
     pub fn get_pipeline_from_handle(
         &self,
         handle: &handle::ResourceHandle,
     ) -> Result<&wgpu::RenderPipeline, &'static str> {
-
         let value = handle.get_value();
         let pipe = match self.pipe_mapper.get(&value) {
             Some(pipe) => pipe,
@@ -84,10 +71,9 @@ impl PipelineManager {
         &self,
         handle: handle::ResourceHandle,
     ) -> Result<&wgpu::BindGroupLayout, &'static str> {
-
         let value = handle.get_value();
         let group = match self.bg_mapper.get(&value) {
-            Some(group ) => group,
+            Some(group) => group,
             None => return Err("could not find binding group layout")
         };
         Ok(group)
@@ -223,7 +209,7 @@ impl PipelineManager {
         let bg_layout_handle = self
             .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
             .await;
-        
+
         let bg_layout = self.get_bind_group_from_handle(bg_layout_handle);
 
         let render_pipeline_layout =
@@ -233,34 +219,31 @@ impl PipelineManager {
                     bind_group_layouts: &[&bg_layout.unwrap()],
                 });
 
-        let render_pipeline =
-            gpu_interfaces
-                .device
-                .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    layout: &render_pipeline_layout,
-                    vertex_stage: vs_stage,
-                    //frag is optional so we wrap it into an optioal
-                    fragment_stage: fs_stage,
-                    rasterization_state: Some(raster_state),
-                    color_states: &color_states[..],
-                    primitive_topology: primitive_topology,
-                    depth_stencil_state: None,
-                    vertex_state: wgpu::VertexStateDescriptor {
-                        index_format: wgpu::IndexFormat::Uint16,
-                        vertex_buffers: &[],
-                    },
-                    sample_count: 1,
-                    sample_mask: !0,
-                    alpha_to_coverage_enabled: false,
-                });
-
-        render_pipeline
+        gpu_interfaces
+            .device
+            .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+                layout: &render_pipeline_layout,
+                vertex_stage: vs_stage,
+                //frag is optional so we wrap it into an optioal
+                fragment_stage: fs_stage,
+                rasterization_state: Some(raster_state),
+                color_states: &color_states[..],
+                primitive_topology,
+                depth_stencil_state: None,
+                vertex_state: wgpu::VertexStateDescriptor {
+                    index_format: wgpu::IndexFormat::Uint16,
+                    vertex_buffers: &[],
+                },
+                sample_count: 1,
+                sample_mask: !0,
+                alpha_to_coverage_enabled: false,
+            })
     }
 }
 
-pub fn get_bind_group_visibility(visiblities: &Vec<Value>) -> wgpu::ShaderStage {
+pub fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
     let mut out_vis = wgpu::ShaderStage::NONE;
-    for visibility in visiblities {
+    for visibility in visibilities {
         let visibility_str = visibility.as_str().unwrap();
         out_vis |= match visibility_str {
             "vertex" => wgpu::ShaderStage::VERTEX,
@@ -363,6 +346,7 @@ fn get_raster_facing(raster_value: &Value) -> wgpu::FrontFace {
         ),
     }
 }
+
 fn get_raster_cull(raster_value: &Value) -> wgpu::CullMode {
     let cull_str = raster_value["cull_mode"].as_str().unwrap();
     match cull_str {

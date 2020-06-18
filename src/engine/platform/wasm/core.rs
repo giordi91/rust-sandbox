@@ -13,3 +13,8 @@ macro_rules! log {
 pub fn to_console(message: &str) {
     log!("{}", message);
 }
+
+
+pub fn get_time_in_micro() -> u64 {
+    (web_sys::window().unwrap().performance().unwrap().now() * 1000.0) as u64
+}

@@ -15,6 +15,7 @@ pub struct GPUInterfaces {
     pub swap_chain: wgpu::SwapChain,
 }
 
+#[derive(Default)]
 pub struct ResourceManagers
 {
     pub shader_manager : ShaderManager,
@@ -79,14 +80,3 @@ impl GPUInterfaces {
     }
 }
 
-
-impl ResourceManagers 
-{
-    pub fn new()-> Self
-    {
-       Self{
-           shader_manager: ShaderManager::new(),
-           pipeline_manager: PipelineManager::new(),
-       } 
-    }
-}

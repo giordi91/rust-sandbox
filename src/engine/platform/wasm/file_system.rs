@@ -5,7 +5,7 @@ use web_sys::{Request, RequestInit, RequestMode, Response};
 
 use super::core;
 
-pub async fn load_file_u8(url : &String) -> Result<Vec<u8>, JsValue> {
+pub async fn load_file_u8(url : &str) -> Result<Vec<u8>, JsValue> {
     let mut opts = RequestInit::new();
     opts.method("GET");
     opts.mode(RequestMode::Cors);
@@ -25,10 +25,10 @@ pub async fn load_file_u8(url : &String) -> Result<Vec<u8>, JsValue> {
     //we initialize the array buffer out of the JsValue
     let bt :js_sys::ArrayBuffer = js_sys::ArrayBuffer::from(t);
     //next we use the array buffer to initialize a uin8Array
-    let typebuf: js_sys::Uint8Array = js_sys::Uint8Array::new(&bt);
+    let typedbuf: js_sys::Uint8Array = js_sys::Uint8Array::new(&bt);
     //finally we copy this array into the final vector
-    let mut body = vec![0 as u8; typebuf.length() as usize];
-    typebuf.copy_to(&mut body);
+    let mut body = vec![0 as u8; typedbuf.length() as usize];
+    typedbuf.copy_to(&mut body);
     Ok(body)
 }
 

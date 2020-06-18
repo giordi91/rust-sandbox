@@ -1,7 +1,7 @@
 use crate::engine::graphics::shader::ShaderType;
 use super::file_system;
 
-pub async fn compile_shader(file_name: &String, shader_type: &ShaderType) -> Vec<u32> {
+pub async fn compile_shader(file_name: &str, shader_type: &ShaderType) -> Vec<u32> {
     let compile_shader_type = match shader_type {
         ShaderType::VERTEX => shaderc::ShaderKind::Vertex,
         ShaderType::FRAGMENT => shaderc::ShaderKind::Fragment,
