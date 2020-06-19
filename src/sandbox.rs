@@ -1,11 +1,13 @@
+use std::mem;
+
 use winit::{event::*, window::Window};
+use async_trait::async_trait;
+use gltf;
 
 use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
-use async_trait::async_trait;
-use gltf;
 
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
@@ -19,6 +21,7 @@ pub struct Sandbox {
     per_frame_data: graphics::FrameData,
     time_stamp: u64,
     delta_time: u64,
+    vertex_buffer: wgpu::Buffer,
 }
 
 #[async_trait(?Send)]
@@ -93,6 +96,7 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
+        /*
         //let us have a look at the gltf cube
         let gltf_content = platform::file_system::load_file_u8("resources/cube/cube.gltf")
             .await
@@ -121,6 +125,14 @@ impl platform::Application for Sandbox {
                 }
             }
         }
+        for mesh in gltf.meshes() {
+            println!("{}",mesh.name().unwrap());
+        }
+        */
+
+        let vertex_buffer = gpu_interfaces
+            .device
+            .create_buffer_with_data(bytemuck::cast_slice(graphics::model::VERTICES), wgpu::BufferUsage::VERTEX);
 
         Self {
             engine_runtime,
@@ -134,6 +146,7 @@ impl platform::Application for Sandbox {
             per_frame_data,
             time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
+            vertex_buffer,
         }
     }
 
