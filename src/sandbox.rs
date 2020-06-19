@@ -5,6 +5,7 @@ use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
 use async_trait::async_trait;
+use gltf;
 
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
@@ -17,7 +18,7 @@ pub struct Sandbox {
     camera_controller: graphics::camera::CameraControllerFPS,
     per_frame_data: graphics::FrameData,
     time_stamp: u64,
-    delta_time: u64
+    delta_time: u64,
 }
 
 #[async_trait(?Send)]
@@ -92,6 +93,34 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
+        //let us have a look at the gltf cube
+        let gltf_content = platform::file_system::load_file_u8("resources/cube/cube.gltf")
+            .await
+            .unwrap();
+        let gltf = gltf::Gltf::from_slice(&gltf_content[..]).unwrap();
+        for scene in gltf.scenes() {
+
+            //scene
+            for root in scene.nodes() {
+                let fmt_str = format!(
+                    "Node #{} has {} children",
+                    root.index(),
+                    root.children().count(),
+                );
+                platform::core::to_console(&fmt_str[..]);
+
+                for child in root.children()
+                {
+                    println!("{}",child.index());
+                    let mesh = child.mesh();
+                    match mesh {
+                        Some(mesh_node) => println!("found mesh"),
+                        _ => println!("no mesh")
+                    }
+
+                }
+            }
+        }
 
         Self {
             engine_runtime,
@@ -103,7 +132,7 @@ impl platform::Application for Sandbox {
             color,
             camera_controller,
             per_frame_data,
-            time_stamp:platform::core::get_time_in_micro(),
+            time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
         }
     }
@@ -125,7 +154,8 @@ impl platform::Application for Sandbox {
         self.time_stamp = curr_time;
 
         //not doing anything here yet
-        self.camera_controller.update_camera(&mut self.camera, self.delta_time);
+        self.camera_controller
+            .update_camera(&mut self.camera, self.delta_time);
         self.per_frame_data.update_view_proj(&self.camera);
 
         // Copy operation's are performed on the gpu, so we'll need
