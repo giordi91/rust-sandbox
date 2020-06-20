@@ -98,7 +98,7 @@ impl platform::Application for Sandbox {
                 });
 
 
-        let model = graphics::model::load_gltf_model("resources/cube/cube.gltf").await;
+        let gltf_file = graphics::model::load_gltf_file("resources/cube/cube.gltf",&gpu_interfaces).await;
 
         let vertex_buffer = gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(graphics::model::VERTICES),
