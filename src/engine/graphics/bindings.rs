@@ -4,6 +4,7 @@ use std::collections::HashMap;
 use super::super::handle;
 use crate::engine::graphics;
 use crate::engine::platform::file_system;
+use super::model;
 
 #[derive(Default)]
 pub struct PipelineManager {
@@ -232,7 +233,7 @@ impl PipelineManager {
                 depth_stencil_state: None,
                 vertex_state: wgpu::VertexStateDescriptor {
                     index_format: wgpu::IndexFormat::Uint16,
-                    vertex_buffers: &[],
+                    vertex_buffers: &[model::Vertex::desc()],
                 },
                 sample_count: 1,
                 sample_mask: !0,

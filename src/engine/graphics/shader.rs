@@ -47,11 +47,14 @@ impl ShaderManager {
             //but is an expensive download, so we just try to download it later on. The
             //function exists mostly for simmetry between native and wasm
             platform::Platform::BROWSER => true,
-            platform::Platform::NATIVE => file_system::file_exists(&spv).await,
+            //TODO here I want an engine setting I can pass to see if I want to force shader
+            //compilation from spv. for now we force it here on native
+            platform::Platform::NATIVE => false && file_system::file_exists(&spv).await,
         };
 
         let file_name = if spv_exists { spv } else { shader_file };
         let binary_data: Vec<u32>;
+
 
         if !spv_exists {
             binary_data = platform::shader::compile_shader(&file_name, &shader_type).await;

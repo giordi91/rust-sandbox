@@ -1,13 +1,12 @@
 use std::mem;
 
-use winit::{event::*, window::Window};
 use async_trait::async_trait;
 use gltf;
+use winit::{event::*, window::Window};
 
 use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
-
 
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
@@ -22,6 +21,9 @@ pub struct Sandbox {
     time_stamp: u64,
     delta_time: u64,
     vertex_buffer: wgpu::Buffer,
+    index_buffer: wgpu::Buffer,
+    vertex_count: u32,
+    index_count: u32,
 }
 
 #[async_trait(?Send)]
@@ -130,9 +132,17 @@ impl platform::Application for Sandbox {
         }
         */
 
-        let vertex_buffer = gpu_interfaces
-            .device
-            .create_buffer_with_data(bytemuck::cast_slice(graphics::model::VERTICES), wgpu::BufferUsage::VERTEX);
+        let vertex_buffer = gpu_interfaces.device.create_buffer_with_data(
+            bytemuck::cast_slice(graphics::model::VERTICES),
+            wgpu::BufferUsage::VERTEX,
+        );
+
+        let index_buffer = gpu_interfaces.device.create_buffer_with_data(
+            bytemuck::cast_slice(graphics::model::INDICES),
+            wgpu::BufferUsage::INDEX,
+        );
+        let vertex_count = graphics::model::VERTICES.len() as u32;
+        let index_count = graphics::model::INDICES.len() as u32;
 
         Self {
             engine_runtime,
@@ -147,6 +157,9 @@ impl platform::Application for Sandbox {
             time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
             vertex_buffer,
+            index_buffer,
+            vertex_count,
+            index_count,
         }
     }
 
@@ -249,7 +262,9 @@ impl platform::Application for Sandbox {
                 .get_pipeline_from_handle(&self.render_pipeline_handle);
             render_pass.set_pipeline(&render_pipeline.unwrap());
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.draw(0..3, 0..1);
+            render_pass.set_vertex_buffer(0, &self.vertex_buffer, 0, 0);
+            render_pass.set_index_buffer(&self.index_buffer, 0, 0);
+            render_pass.draw_indexed(0..self.index_count, 0,0..1);
         }
         self.color += 0.001;
         if self.color > 1.0 {
