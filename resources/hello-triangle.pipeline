@@ -12,7 +12,7 @@
     },
     "primitive_topology": "triangleList",
     "vertex_state": {
-        "index_format": "uint16"
+        "type" : "vertex_color"
     },
     "color_states": [
         {

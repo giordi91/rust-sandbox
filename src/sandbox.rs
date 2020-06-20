@@ -69,7 +69,8 @@ impl platform::Application for Sandbox {
             .pipeline_manager
             .load_pipeline(
                 "resources/hello-triangle.pipeline",
-                &mut engine_runtime.resource_managers.shader_manager,
+                graphics::bindings::PipelineConfig{index_buffer_uint16: true}
+                ,&mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
                 //&uniform_bind_group_layout,
             )

@@ -9,7 +9,7 @@ pub enum ResourceHandleType {
     Invalid = !0,
 }
 
-const HANDLE_TYPE_BIT_COUNT: u64 = 10;
+pub const HANDLE_TYPE_BIT_COUNT: u64 = 10;
 //common trick, to generate a mask. If you wanna set the low n bits of an int,
 //you shift by N and subtract one, subtracting one will flipp all the N bits to 1
 const HANDLE_TYPE_MASK_BIT_RANGE: u64 = (1 << HANDLE_TYPE_BIT_COUNT) - 1;

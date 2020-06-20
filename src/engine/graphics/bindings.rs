@@ -2,9 +2,14 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use super::super::handle;
+use super::model;
 use crate::engine::graphics;
 use crate::engine::platform::file_system;
-use super::model;
+
+pub struct PipelineConfig {
+    //if we start having more bools, transform intof flags
+    pub index_buffer_uint16: bool,
+}
 
 #[derive(Default)]
 pub struct PipelineManager {
@@ -19,13 +24,20 @@ impl PipelineManager {
     pub async fn load_pipeline(
         &mut self,
         file_name: &str,
+        config: PipelineConfig,
         shader_manager: &mut graphics::shader::ShaderManager,
         gpu_interfaces: &graphics::api::GPUInterfaces,
         //layout: &wgpu::BindGroupLayout,
     ) -> handle::ResourceHandle {
         let loaded = self.pipe_path_mapper.contains_key(file_name);
         if loaded {
-            return handle::ResourceHandle::from_data(self.pipe_path_mapper[file_name]);
+            let handle_data = self.pipe_path_mapper[file_name];
+            //we need to check if the handle matches the index buffer size
+            let index_16bit_tag = (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT);
+            let pipe_correct_index_size = (handle_data & index_16bit_tag) > 0;
+            if pipe_correct_index_size {
+                return handle::ResourceHandle::from_data(handle_data);
+            }
         }
 
         let pipe_source = file_system::load_file_string(file_name).await.unwrap();
@@ -36,25 +48,30 @@ impl PipelineManager {
             "raster" => {
                 self.process_raster_pipeline(
                     pipe_content_json,
+                    &config,
                     shader_manager,
                     gpu_interfaces,
                     //           layout,
                 )
-                    .await
+                .await
             }
             _ => panic!(),
         };
 
         self.handle_counter += 1;
-        self.pipe_mapper
-            .insert(self.handle_counter, pipe);
-        self.pipe_path_mapper
-            .insert(String::from(file_name), self.handle_counter);
+        let handle = self.handle_counter;
+        //we need to tag the handle with the config
+        let tag = match config.index_buffer_uint16 {
+            true => (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT),
+            false => 0 as u64,
+        };
+        let tag_handle = handle | tag;
 
-        handle::ResourceHandle::new(
-            handle::ResourceHandleType::RenderPipeline,
-            self.handle_counter,
-        )
+        self.pipe_mapper.insert(tag_handle, pipe);
+        self.pipe_path_mapper
+            .insert(String::from(file_name), tag_handle);
+
+        handle::ResourceHandle::new(handle::ResourceHandleType::RenderPipeline, tag_handle)
     }
     pub fn get_pipeline_from_handle(
         &self,
@@ -63,7 +80,7 @@ impl PipelineManager {
         let value = handle.get_value();
         let pipe = match self.pipe_mapper.get(&value) {
             Some(pipe) => pipe,
-            None => return Err("could not find binding group layout")
+            None => return Err("could not find binding group layout"),
         };
         Ok(pipe)
     }
@@ -75,7 +92,7 @@ impl PipelineManager {
         let value = handle.get_value();
         let group = match self.bg_mapper.get(&value) {
             Some(group) => group,
-            None => return Err("could not find binding group layout")
+            None => return Err("could not find binding group layout"),
         };
         Ok(group)
     }
@@ -109,7 +126,6 @@ impl PipelineManager {
             })
         }
 
-
         //oh wow... all this to get the string
         let file_name_no_ext = std::path::Path::new(file_name)
             .file_stem()
@@ -139,6 +155,7 @@ impl PipelineManager {
     async fn process_raster_pipeline(
         &mut self,
         pipe_content_json: Value,
+        config: &PipelineConfig,
         shader_manager: &mut graphics::shader::ShaderManager,
         gpu_interfaces: &graphics::api::GPUInterfaces,
         //layout: &wgpu::BindGroupLayout,
@@ -232,7 +249,10 @@ impl PipelineManager {
                 primitive_topology,
                 depth_stencil_state: None,
                 vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: wgpu::IndexFormat::Uint16,
+                    index_format: match config.index_buffer_uint16 {
+                        true => wgpu::IndexFormat::Uint16,
+                        false => wgpu::IndexFormat::Uint32,
+                    },
                     vertex_buffers: &[model::Vertex::desc()],
                 },
                 sample_count: 1,
