@@ -1,7 +1,5 @@
-use std::mem;
 
 use async_trait::async_trait;
-use gltf;
 use winit::{event::*, window::Window};
 
 use rust_sandbox::engine::graphics;
@@ -99,39 +97,8 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
-        /*
-        //let us have a look at the gltf cube
-        let gltf_content = platform::file_system::load_file_u8("resources/cube/cube.gltf")
-            .await
-            .unwrap();
-        let gltf = gltf::Gltf::from_slice(&gltf_content[..]).unwrap();
-        for scene in gltf.scenes() {
 
-            //scene
-            for root in scene.nodes() {
-                let fmt_str = format!(
-                    "Node #{} has {} children",
-                    root.index(),
-                    root.children().count(),
-                );
-                platform::core::to_console(&fmt_str[..]);
-
-                for child in root.children()
-                {
-                    println!("{}",child.index());
-                    let mesh = child.mesh();
-                    match mesh {
-                        Some(mesh_node) => println!("found mesh"),
-                        _ => println!("no mesh")
-                    }
-
-                }
-            }
-        }
-        for mesh in gltf.meshes() {
-            println!("{}",mesh.name().unwrap());
-        }
-        */
+        let model = graphics::model::load_gltf_model("resources/cube/cube.gltf").await;
 
         let vertex_buffer = gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(graphics::model::VERTICES),

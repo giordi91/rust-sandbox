@@ -64,13 +64,12 @@ impl platform::Application for HelloTriangle {
             .pipeline_manager
             .load_pipeline(
                 "resources/hello-triangle.pipeline",
+                graphics::bindings::PipelineConfig{index_buffer_uint16: true},
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
                 //&uniform_bind_group_layout,
             )
             .await;
-
-        platform::core::to_console("NEW2!");
 
         let bg_layout = engine_runtime
             .resource_managers
