@@ -22,6 +22,7 @@ pub struct Sandbox {
     index_buffer: wgpu::Buffer,
     vertex_count: u32,
     index_count: u32,
+    gltf_file: graphics::model::GltfFile
 }
 
 #[async_trait(?Send)]
@@ -128,6 +129,7 @@ impl platform::Application for Sandbox {
             index_buffer,
             vertex_count,
             index_count,
+            gltf_file,
         }
     }
 
@@ -230,9 +232,46 @@ impl platform::Application for Sandbox {
                 .get_pipeline_from_handle(&self.render_pipeline_handle);
             render_pass.set_pipeline(&render_pipeline.unwrap());
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
-            render_pass.set_vertex_buffer(0, &self.vertex_buffer, 0, 0);
-            render_pass.set_index_buffer(&self.index_buffer, 0, 0);
-            render_pass.draw_indexed(0..self.index_count, 0,0..1);
+
+
+            let model = self.gltf_file.models.get(0).unwrap();
+            let mesh = model.meshes.get(0).unwrap();
+            let pos_mapper = mesh.buffers.get(1).unwrap();
+            let pos_idx = pos_mapper.buffer_idx;
+            let pos_buff = self.gltf_file.buffers.get(&pos_idx).unwrap();
+            
+            let n_mapper = mesh.buffers.get(1).unwrap();
+            let n_idx = n_mapper.buffer_idx;
+            let n_buff = self.gltf_file.buffers.get(&n_idx).unwrap();
+
+            let mut idx_count =0;
+            match &mesh.index_buffer
+            {
+                Some(idx_buff_map) =>
+                {
+                let idx = idx_buff_map.buffer_idx;
+                let idx_buff = self.gltf_file.buffers.get(&idx).unwrap();
+                render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
+                idx_count = idx_buff_map.count;
+
+                },
+                None => {},
+            }
+
+
+    //semantic: MeshBufferSemantic,
+    //offset: u32,
+    //length: u32,
+    //buffer_idx: u32,
+
+            render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
+            render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
+            render_pass.draw_indexed(0..idx_count, 0,0..1);
+
+
+            //render_pass.set_vertex_buffer(0, &self.vertex_buffer, 0, 0);
+            //render_pass.set_index_buffer(&self.index_buffer, 0, 0);
+            //render_pass.draw_indexed(0..self.index_count, 0,0..1);
         }
         self.color += 0.001;
         if self.color > 1.0 {

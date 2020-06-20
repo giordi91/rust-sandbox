@@ -237,6 +237,47 @@ impl PipelineManager {
                     bind_group_layouts: &[&bg_layout.unwrap()],
                 });
 
+        let pos_desc = wgpu::VertexBufferDescriptor {
+            stride: 12 as wgpu::BufferAddress,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &[wgpu::VertexAttributeDescriptor {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float3,
+            }],
+        };
+        let normal_desc = wgpu::VertexBufferDescriptor {
+            stride: 12 as wgpu::BufferAddress,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &[wgpu::VertexAttributeDescriptor {
+                offset: 0,
+                shader_location: 1,
+                format: wgpu::VertexFormat::Float3,
+            }],
+        };
+
+        /*
+        pub fn desc<'a>() -> wgpu::VertexBufferDescriptor<'a> {
+            use std::mem;
+            wgpu::VertexBufferDescriptor {
+                stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &[
+                    wgpu::VertexAttributeDescriptor {
+                        offset: 0,
+                        shader_location: 0,
+                        format: wgpu::VertexFormat::Float3,
+                    },
+                    wgpu::VertexAttributeDescriptor {
+                        offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
+                        shader_location: 1,
+                        format: wgpu::VertexFormat::Float3,
+                    },
+                ],
+            }
+        }
+        */
+
         gpu_interfaces
             .device
             .create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -253,7 +294,8 @@ impl PipelineManager {
                         true => wgpu::IndexFormat::Uint16,
                         false => wgpu::IndexFormat::Uint32,
                     },
-                    vertex_buffers: &[model::Vertex::desc()],
+                    //vertex_buffers: &[model::Vertex::desc()],
+                    vertex_buffers: &[pos_desc,normal_desc],
                 },
                 sample_count: 1,
                 sample_mask: !0,

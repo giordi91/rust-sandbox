@@ -68,16 +68,18 @@ impl Vertex {
 }
 
 pub struct MeshBufferMapper {
-    semantic: MeshBufferSemantic,
-    offset: u32,
-    length: u32,
-    buffer_idx: u32,
+    pub semantic: MeshBufferSemantic,
+    pub offset: u32,
+    pub length: u32,
+    pub buffer_idx: u32,
 }
 
 pub struct MeshIndexBufferMapper {
-    offset: u32,
-    length: u32,
-    is_uint16: bool,
+    pub offset: u32,
+    pub length: u32,
+    pub is_uint16: bool,
+    pub buffer_idx: u32,
+    pub count: u32,
 }
 
 #[derive(Default)]
@@ -87,13 +89,14 @@ pub struct Mesh {
 }
 
 pub struct Model {
-    meshes: Vec<Mesh>,
+    pub meshes: Vec<Mesh>,
 }
 
 
 pub struct GltfFile
 {
-    models : Vec<Model>,
+    pub models : Vec<Model>,
+    pub buffers : HashMap<u32,wgpu::Buffer>
 
 } 
 
@@ -194,6 +197,7 @@ fn load_gltf_mesh_primitive(
             let view_offset = buffer_view.offset();
             let total_offset = accessor_offset + view_offset;
             let view_len = buffer_view.length();
+            let count = idx_accessor.count() as u32;
 
             let is_uint16 = match idx_accessor.data_type() {
                 gltf::accessor::DataType::U16 => true,
@@ -205,6 +209,8 @@ fn load_gltf_mesh_primitive(
                 offset: total_offset as u32,
                 length: view_len as u32,
                 is_uint16,
+                buffer_idx : buffer_idx as u32,
+                count,
             };
 
             mesh.index_buffer = Some(mesh_idx_buffer);
@@ -299,5 +305,6 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
 
     GltfFile{
         models,
+        buffers: raw_buffers,
     }
 }
