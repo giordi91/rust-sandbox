@@ -18,10 +18,6 @@ pub struct Sandbox {
     per_frame_data: graphics::FrameData,
     time_stamp: u64,
     delta_time: u64,
-    vertex_buffer: wgpu::Buffer,
-    index_buffer: wgpu::Buffer,
-    vertex_count: u32,
-    index_count: u32,
     gltf_file: graphics::model::GltfFile
 }
 
@@ -75,7 +71,7 @@ impl platform::Application for Sandbox {
             )
             .await;
 
-        platform::core::to_console("NEW2!");
+        platform::core::to_console("NEW3!");
 
         let bg_layout = engine_runtime
             .resource_managers
@@ -101,18 +97,6 @@ impl platform::Application for Sandbox {
 
         let gltf_file = graphics::model::load_gltf_file("resources/cube/cube.gltf",&gpu_interfaces).await;
 
-        let vertex_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(graphics::model::VERTICES),
-            wgpu::BufferUsage::VERTEX,
-        );
-
-        let index_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(graphics::model::INDICES),
-            wgpu::BufferUsage::INDEX,
-        );
-        let vertex_count = graphics::model::VERTICES.len() as u32;
-        let index_count = graphics::model::INDICES.len() as u32;
-
         Self {
             engine_runtime,
             render_pipeline_handle,
@@ -125,10 +109,6 @@ impl platform::Application for Sandbox {
             per_frame_data,
             time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
-            vertex_buffer,
-            index_buffer,
-            vertex_count,
-            index_count,
             gltf_file,
         }
     }
@@ -268,6 +248,7 @@ impl platform::Application for Sandbox {
             self.color = 0.0;
         }
 
+        //new way to submit, when i will be able to move to master branch again
         //self.queue.submit(&[
         //    encoder.finish()
         //]);

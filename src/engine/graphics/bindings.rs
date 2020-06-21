@@ -238,36 +238,8 @@ impl PipelineManager {
                 });
 
 
-        //TODO find a solution for this?
-        //I think the problem comes from the references to wgpu::VertexAttrbiuteDescriptors that 
-        //throws a wrench here. I cannot t
-        let vertex_state_type= pipe_content_json["vertex_state"]["type"].as_str().unwrap();//["type"].as_str().unwrap();
-        //let vertex_state_type= "position_normal";
-        println!("{}",vertex_state_type);
+        let vertex_state_type= pipe_content_json["vertex_state"]["type"].as_str().unwrap();
         let desc = get_vertex_attrbibute_descriptor(vertex_state_type);
-        //let desc = match vertex_state_type{
-        //    "position_normal" => vec![
-        //        wgpu::VertexBufferDescriptor {
-        //            stride: 12 as wgpu::BufferAddress,
-        //            step_mode: wgpu::InputStepMode::Vertex,
-        //            attributes: &[wgpu::VertexAttributeDescriptor {
-        //                offset: 0,
-        //                shader_location: 0,
-        //                format: wgpu::VertexFormat::Float3,
-        //            }],
-        //        },
-        //        wgpu::VertexBufferDescriptor {
-        //            stride: 12 as wgpu::BufferAddress,
-        //            step_mode: wgpu::InputStepMode::Vertex,
-        //            attributes: &[wgpu::VertexAttributeDescriptor {
-        //                offset: 0,
-        //                shader_location: 1,
-        //                format: wgpu::VertexFormat::Float3,
-        //            }],
-        //        },
-        //    ],
-        //    _ => Vec::new(),
-        //};
 
         gpu_interfaces
             .device
@@ -316,7 +288,7 @@ pub fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDes
                 }],
             },
         ],
-        _ => Vec::new(),
+        _ => panic!("could not find {} vertex description",name),
     }
 }
 
