@@ -258,21 +258,11 @@ impl platform::Application for Sandbox {
                 None => {},
             }
 
-
-    //semantic: MeshBufferSemantic,
-    //offset: u32,
-    //length: u32,
-    //buffer_idx: u32,
-
             render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
             render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
             render_pass.draw_indexed(0..idx_count, 0,0..1);
-
-
-            //render_pass.set_vertex_buffer(0, &self.vertex_buffer, 0, 0);
-            //render_pass.set_index_buffer(&self.index_buffer, 0, 0);
-            //render_pass.draw_indexed(0..self.index_count, 0,0..1);
         }
+
         self.color += 0.001;
         if self.color > 1.0 {
             self.color = 0.0;

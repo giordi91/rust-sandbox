@@ -237,46 +237,37 @@ impl PipelineManager {
                     bind_group_layouts: &[&bg_layout.unwrap()],
                 });
 
-        let pos_desc = wgpu::VertexBufferDescriptor {
-            stride: 12 as wgpu::BufferAddress,
-            step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &[wgpu::VertexAttributeDescriptor {
-                offset: 0,
-                shader_location: 0,
-                format: wgpu::VertexFormat::Float3,
-            }],
-        };
-        let normal_desc = wgpu::VertexBufferDescriptor {
-            stride: 12 as wgpu::BufferAddress,
-            step_mode: wgpu::InputStepMode::Vertex,
-            attributes: &[wgpu::VertexAttributeDescriptor {
-                offset: 0,
-                shader_location: 1,
-                format: wgpu::VertexFormat::Float3,
-            }],
-        };
 
-        /*
-        pub fn desc<'a>() -> wgpu::VertexBufferDescriptor<'a> {
-            use std::mem;
-            wgpu::VertexBufferDescriptor {
-                stride: mem::size_of::<Vertex>() as wgpu::BufferAddress,
-                step_mode: wgpu::InputStepMode::Vertex,
-                attributes: &[
-                    wgpu::VertexAttributeDescriptor {
-                        offset: 0,
-                        shader_location: 0,
-                        format: wgpu::VertexFormat::Float3,
-                    },
-                    wgpu::VertexAttributeDescriptor {
-                        offset: mem::size_of::<[f32; 3]>() as wgpu::BufferAddress,
-                        shader_location: 1,
-                        format: wgpu::VertexFormat::Float3,
-                    },
-                ],
-            }
-        }
-        */
+        //TODO find a solution for this?
+        //I think the problem comes from the references to wgpu::VertexAttrbiuteDescriptors that 
+        //throws a wrench here. I cannot t
+        let vertex_state_type= pipe_content_json["vertex_state"]["type"].as_str().unwrap();//["type"].as_str().unwrap();
+        //let vertex_state_type= "position_normal";
+        println!("{}",vertex_state_type);
+        let desc = get_vertex_attrbibute_descriptor(vertex_state_type);
+        //let desc = match vertex_state_type{
+        //    "position_normal" => vec![
+        //        wgpu::VertexBufferDescriptor {
+        //            stride: 12 as wgpu::BufferAddress,
+        //            step_mode: wgpu::InputStepMode::Vertex,
+        //            attributes: &[wgpu::VertexAttributeDescriptor {
+        //                offset: 0,
+        //                shader_location: 0,
+        //                format: wgpu::VertexFormat::Float3,
+        //            }],
+        //        },
+        //        wgpu::VertexBufferDescriptor {
+        //            stride: 12 as wgpu::BufferAddress,
+        //            step_mode: wgpu::InputStepMode::Vertex,
+        //            attributes: &[wgpu::VertexAttributeDescriptor {
+        //                offset: 0,
+        //                shader_location: 1,
+        //                format: wgpu::VertexFormat::Float3,
+        //            }],
+        //        },
+        //    ],
+        //    _ => Vec::new(),
+        //};
 
         gpu_interfaces
             .device
@@ -294,13 +285,38 @@ impl PipelineManager {
                         true => wgpu::IndexFormat::Uint16,
                         false => wgpu::IndexFormat::Uint32,
                     },
-                    //vertex_buffers: &[model::Vertex::desc()],
-                    vertex_buffers: &[pos_desc,normal_desc],
+                    vertex_buffers: &desc[..],
                 },
                 sample_count: 1,
                 sample_mask: !0,
                 alpha_to_coverage_enabled: false,
             })
+    }
+}
+
+pub fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescriptor<'static>> {
+    match name {
+        "position_normal" => vec![
+            wgpu::VertexBufferDescriptor {
+                stride: 12 as wgpu::BufferAddress,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &[wgpu::VertexAttributeDescriptor {
+                    offset: 0,
+                    shader_location: 0,
+                    format: wgpu::VertexFormat::Float3,
+                }],
+            },
+            wgpu::VertexBufferDescriptor {
+                stride: 12 as wgpu::BufferAddress,
+                step_mode: wgpu::InputStepMode::Vertex,
+                attributes: &[wgpu::VertexAttributeDescriptor {
+                    offset: 0,
+                    shader_location: 1,
+                    format: wgpu::VertexFormat::Float3,
+                }],
+            },
+        ],
+        _ => Vec::new(),
     }
 }
 
