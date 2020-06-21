@@ -236,11 +236,11 @@ impl platform::Application for Sandbox {
 
             let model = self.gltf_file.models.get(0).unwrap();
             let mesh = model.meshes.get(0).unwrap();
-            let pos_mapper = mesh.buffers.get(1).unwrap();
+            let pos_mapper = mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
             let pos_idx = pos_mapper.buffer_idx;
             let pos_buff = self.gltf_file.buffers.get(&pos_idx).unwrap();
             
-            let n_mapper = mesh.buffers.get(1).unwrap();
+            let n_mapper = mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
             let n_idx = n_mapper.buffer_idx;
             let n_buff = self.gltf_file.buffers.get(&n_idx).unwrap();
 

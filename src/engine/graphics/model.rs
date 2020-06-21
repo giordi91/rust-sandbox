@@ -9,6 +9,7 @@ pub struct Vertex {
     color: [f32; 3],
 }
 
+#[derive(PartialEq)]
 pub enum MeshBufferSemantic {
     None,
     Positions,
@@ -88,17 +89,26 @@ pub struct Mesh {
     pub index_buffer: Option<MeshIndexBufferMapper>,
 }
 
+impl Mesh {
+    pub fn get_buffer_from_semantic(&self, semantic: MeshBufferSemantic) -> &MeshBufferMapper{
+        for buffer in self.buffers.iter() {
+            if buffer.semantic == semantic {
+                return buffer;
+            }
+        }
+
+        panic!("");
+    }
+}
+
 pub struct Model {
     pub meshes: Vec<Mesh>,
 }
 
-
-pub struct GltfFile
-{
-    pub models : Vec<Model>,
-    pub buffers : HashMap<u32,wgpu::Buffer>
-
-} 
+pub struct GltfFile {
+    pub models: Vec<Model>,
+    pub buffers: HashMap<u32, wgpu::Buffer>,
+}
 
 fn load_gltf_mesh_primitive(
     primitive: &gltf::Primitive,
@@ -209,7 +219,7 @@ fn load_gltf_mesh_primitive(
                 offset: total_offset as u32,
                 length: view_len as u32,
                 is_uint16,
-                buffer_idx : buffer_idx as u32,
+                buffer_idx: buffer_idx as u32,
                 count,
             };
 
@@ -303,7 +313,7 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
         models.push(model);
     }
 
-    GltfFile{
+    GltfFile {
         models,
         buffers: raw_buffers,
     }
