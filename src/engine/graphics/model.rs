@@ -103,17 +103,6 @@ fn load_gltf_mesh_primitive(
         //just making sure the buffer is in the raw list
         assert!(raw_buffers.contains_key(&(buffer_idx as u32)));
 
-        //here we copy the data into corresponding gpu buffers
-        //TODO have some smarter logic to keep a single allocation and only
-        //using offsets
-        let wgpu_buffer_usage = match wgpu_semantic {
-            MeshBufferSemantic::Normals | MeshBufferSemantic::Positions => {
-                wgpu::BufferUsage::VERTEX
-            }
-            _ => panic!("Requested wgpu_semantic not yet supported"),
-        };
-
-        //semantics.push(wgpu_semantic);
 
         //need to find the correct slice of the buffer
         let accessor_offset = accessor.offset();

@@ -154,3 +154,4 @@ pub fn run_application<T: Application>(window_title: &str)
             ));
         }
 }
+
