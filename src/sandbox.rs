@@ -1,4 +1,3 @@
-
 use async_trait::async_trait;
 use winit::{event::*, window::Window};
 
@@ -18,7 +17,8 @@ pub struct Sandbox {
     per_frame_data: graphics::FrameData,
     time_stamp: u64,
     delta_time: u64,
-    gltf_file: graphics::model::GltfFile
+    gltf_file: graphics::model::GltfFile,
+    depth_texture: graphics::texture::Texture,
 }
 
 #[async_trait(?Send)]
@@ -59,15 +59,16 @@ impl platform::Application for Sandbox {
             .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
             .await;
 
+        let default_depth_format = wgpu::TextureFormat::Depth32Float;
+
         let render_pipeline_handle = engine_runtime
             .resource_managers
             .pipeline_manager
             .load_pipeline(
-                "resources/hello-triangle.pipeline",
-                graphics::bindings::PipelineConfig{index_buffer_uint16: false}
-                ,&mut engine_runtime.resource_managers.shader_manager,
+                "resources/gltf_model.pipeline",
+                &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
-                //&uniform_bind_group_layout,
+                default_depth_format
             )
             .await;
 
@@ -94,8 +95,17 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
+        let gltf_file = graphics::model::load_gltf_file(
+            "resources/external/dragon/dragon.gltf",
+            &gpu_interfaces,
+        )
+        .await;
 
-        let gltf_file = graphics::model::load_gltf_file("resources/cube/cube.gltf",&gpu_interfaces).await;
+        let depth_texture = graphics::texture::Texture::create_depth_texture(
+            &engine_runtime.gpu_interfaces.device,
+            &engine_runtime.gpu_interfaces.sc_desc,
+            "swap-depth",
+        );
 
         Self {
             engine_runtime,
@@ -110,6 +120,7 @@ impl platform::Application for Sandbox {
             time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
             gltf_file,
+            depth_texture,
         }
     }
 
@@ -189,6 +200,18 @@ impl platform::Application for Sandbox {
             });
 
         {
+
+            let depth_stencil_attachment =Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.depth_texture.view,
+                depth_load_op: wgpu::LoadOp::Clear,
+                depth_store_op: wgpu::StoreOp::Store,
+                clear_depth: 1.0,
+                stencil_load_op: wgpu::LoadOp::Clear,
+                stencil_store_op: wgpu::StoreOp::Store,
+                clear_stencil: 0,
+            }) ;
+
+
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -202,7 +225,7 @@ impl platform::Application for Sandbox {
                         a: 1.0,
                     },
                 }],
-                depth_stencil_attachment: None,
+                depth_stencil_attachment,
             });
 
             let render_pipeline = self
@@ -213,34 +236,32 @@ impl platform::Application for Sandbox {
             render_pass.set_pipeline(&render_pipeline.unwrap());
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-
             let model = self.gltf_file.models.get(0).unwrap();
             let mesh = model.meshes.get(0).unwrap();
-            let pos_mapper = mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
+            let pos_mapper =
+                mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
             let pos_idx = pos_mapper.buffer_idx;
             let pos_buff = self.gltf_file.buffers.get(&pos_idx).unwrap();
-            
-            let n_mapper = mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
+
+            let n_mapper =
+                mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
             let n_idx = n_mapper.buffer_idx;
             let n_buff = self.gltf_file.buffers.get(&n_idx).unwrap();
 
-            let mut idx_count =0;
-            match &mesh.index_buffer
-            {
-                Some(idx_buff_map) =>
-                {
-                let idx = idx_buff_map.buffer_idx;
-                let idx_buff = self.gltf_file.buffers.get(&idx).unwrap();
-                render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
-                idx_count = idx_buff_map.count;
-
-                },
-                None => {},
+            let mut idx_count = 0;
+            match &mesh.index_buffer {
+                Some(idx_buff_map) => {
+                    let idx = idx_buff_map.buffer_idx;
+                    let idx_buff = self.gltf_file.buffers.get(&idx).unwrap();
+                    render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
+                    idx_count = idx_buff_map.count;
+                }
+                None => {}
             }
 
             render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
             render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
-            render_pass.draw_indexed(0..idx_count, 0,0..1);
+            render_pass.draw_indexed(0..idx_count, 0, 0..1);
         }
 
         self.color += 0.001;

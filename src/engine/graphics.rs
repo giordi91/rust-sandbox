@@ -3,6 +3,7 @@ pub mod camera;
 pub mod api;
 pub mod bindings;
 pub mod model;
+pub mod texture;
 
 
 

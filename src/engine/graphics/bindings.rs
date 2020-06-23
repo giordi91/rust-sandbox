@@ -2,14 +2,8 @@ use serde_json::Value;
 use std::collections::HashMap;
 
 use super::super::handle;
-use super::model;
 use crate::engine::graphics;
 use crate::engine::platform::file_system;
-
-pub struct PipelineConfig {
-    //if we start having more bools, transform intof flags
-    pub index_buffer_uint16: bool,
-}
 
 #[derive(Default)]
 pub struct PipelineManager {
@@ -24,9 +18,9 @@ impl PipelineManager {
     pub async fn load_pipeline(
         &mut self,
         file_name: &str,
-        config: PipelineConfig,
         shader_manager: &mut graphics::shader::ShaderManager,
         gpu_interfaces: &graphics::api::GPUInterfaces,
+        default_depth_format: wgpu::TextureFormat,
         //layout: &wgpu::BindGroupLayout,
     ) -> handle::ResourceHandle {
         let loaded = self.pipe_path_mapper.contains_key(file_name);
@@ -48,10 +42,9 @@ impl PipelineManager {
             "raster" => {
                 self.process_raster_pipeline(
                     pipe_content_json,
-                    &config,
                     shader_manager,
                     gpu_interfaces,
-                    //           layout,
+                    default_depth_format,
                 )
                 .await
             }
@@ -60,18 +53,12 @@ impl PipelineManager {
 
         self.handle_counter += 1;
         let handle = self.handle_counter;
-        //we need to tag the handle with the config
-        let tag = match config.index_buffer_uint16 {
-            true => (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT),
-            false => 0 as u64,
-        };
-        let tag_handle = handle | tag;
 
-        self.pipe_mapper.insert(tag_handle, pipe);
+        self.pipe_mapper.insert(handle, pipe);
         self.pipe_path_mapper
-            .insert(String::from(file_name), tag_handle);
+            .insert(String::from(file_name), handle);
 
-        handle::ResourceHandle::new(handle::ResourceHandleType::RenderPipeline, tag_handle)
+        handle::ResourceHandle::new(handle::ResourceHandleType::RenderPipeline, handle)
     }
     pub fn get_pipeline_from_handle(
         &self,
@@ -155,9 +142,9 @@ impl PipelineManager {
     async fn process_raster_pipeline(
         &mut self,
         pipe_content_json: Value,
-        config: &PipelineConfig,
         shader_manager: &mut graphics::shader::ShaderManager,
         gpu_interfaces: &graphics::api::GPUInterfaces,
+        default_depth_format: wgpu::TextureFormat,
         //layout: &wgpu::BindGroupLayout,
     ) -> wgpu::RenderPipeline {
         //get the shaders
@@ -208,6 +195,9 @@ impl PipelineManager {
         //next is raster state
         let raster_state = get_pipeline_raster_state(&pipe_content_json);
 
+        //depth state
+        let depth_stencil_state = get_depth_stencil_state(&pipe_content_json, default_depth_format);
+
         let primitive_value = pipe_content_json["primitive_topology"].as_str().unwrap();
         let primitive_topology = match primitive_value {
             "pointList" => wgpu::PrimitiveTopology::PointList,
@@ -237,8 +227,7 @@ impl PipelineManager {
                     bind_group_layouts: &[&bg_layout.unwrap()],
                 });
 
-
-        let vertex_state_type= pipe_content_json["vertex_state"]["type"].as_str().unwrap();
+        let vertex_state_type = pipe_content_json["vertex_state"]["type"].as_str().unwrap();
         let desc = get_vertex_attrbibute_descriptor(vertex_state_type);
 
         gpu_interfaces
@@ -251,12 +240,9 @@ impl PipelineManager {
                 rasterization_state: Some(raster_state),
                 color_states: &color_states[..],
                 primitive_topology,
-                depth_stencil_state: None,
+                depth_stencil_state,
                 vertex_state: wgpu::VertexStateDescriptor {
-                    index_format: match config.index_buffer_uint16 {
-                        true => wgpu::IndexFormat::Uint16,
-                        false => wgpu::IndexFormat::Uint32,
-                    },
+                    index_format: wgpu::IndexFormat::Uint32,
                     vertex_buffers: &desc[..],
                 },
                 sample_count: 1,
@@ -266,7 +252,58 @@ impl PipelineManager {
     }
 }
 
-pub fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescriptor<'static>> {
+fn get_depth_stencil_state(
+    pipe_content_json: &Value,
+    swap_depth_format: wgpu::TextureFormat,
+) -> Option<wgpu::DepthStencilStateDescriptor> {
+    let state_value = &pipe_content_json["depth_state"];
+    if state_value.is_null() {
+        return None;
+    }
+
+    let format_str = state_value["format"].as_str().unwrap();
+
+    let format = match format_str {
+        "default" => swap_depth_format,
+        _ => panic!(
+            "unsupported swap chain dept format {:?}, if is a valid type add it to the function",
+            swap_depth_format
+        ),
+    };
+
+    let depth_write_enabled = state_value["depth_write_enabled"].as_bool().unwrap();
+    let depth_compare = get_compare_function(&state_value["depth_compare"]);
+
+    Some(wgpu::DepthStencilStateDescriptor{
+        format,
+        depth_write_enabled,
+        depth_compare,
+        stencil_front : wgpu::StencilStateFaceDescriptor::IGNORE, 
+        stencil_back : wgpu::StencilStateFaceDescriptor::IGNORE, 
+        stencil_read_mask: 0,
+        stencil_write_mask :0,
+    })
+}
+
+fn get_compare_function(value: &serde_json::Value)-> wgpu::CompareFunction
+{
+    let compare_str = value.as_str().unwrap();
+    match  compare_str
+    {
+        "Undefined" => wgpu::CompareFunction::Undefined,
+        "Never" => wgpu::CompareFunction::Never,
+        "Less" => wgpu::CompareFunction::Less,
+        "Equal" => wgpu::CompareFunction::Equal,
+        "LessEqual" => wgpu::CompareFunction::LessEqual,
+        "Greater" => wgpu::CompareFunction::Greater,
+        "NotEqual" => wgpu::CompareFunction::NotEqual,
+        "GreaterEqual" => wgpu::CompareFunction::GreaterEqual,
+        "Always" => wgpu::CompareFunction::Always,
+        _ => panic!("Not supported compare fuction {}",  compare_str)
+    }
+}
+
+fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescriptor<'static>> {
     match name {
         "position_normal" => vec![
             wgpu::VertexBufferDescriptor {
@@ -288,7 +325,7 @@ pub fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDes
                 }],
             },
         ],
-        _ => panic!("could not find {} vertex description",name),
+        _ => panic!("could not find {} vertex description", name),
     }
 }
 
