@@ -10,7 +10,8 @@ crate-type = ["cdylib", "rlib"]
 
 [dependencies]
 image = "0.23.4"
-cgmath = "0.17"
+#cgmath = "0.17"
+cgmath = {git = "https://github.com/giordi91/cgmath" , rev="330b14669d0d3869f982382bf19b427680697b15"}
 futures = "0.3.5"
 #wgpu = "0.5.0"
 wgpu = { git = "https://github.com/gfx-rs/wgpu-rs", rev="89ee5bffd3c37279f733b76b05e5d030aba035db"  }

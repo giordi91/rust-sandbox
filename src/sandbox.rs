@@ -39,8 +39,8 @@ impl platform::Application for Sandbox {
             up: cgmath::Vector3::unit_y(),
             aspect: gpu_interfaces.sc_desc.width as f32 / gpu_interfaces.sc_desc.height as f32,
             fovy: 45.0,
-            znear: 0.1,
-            zfar: 100.0,
+            znear: 100.0,
+            zfar: 0.1,
         };
 
         let camera_controller = graphics::camera::CameraControllerFPS::new(10.0);
@@ -205,7 +205,7 @@ impl platform::Application for Sandbox {
                 attachment: &self.depth_texture.view,
                 depth_load_op: wgpu::LoadOp::Clear,
                 depth_store_op: wgpu::StoreOp::Store,
-                clear_depth: 1.0,
+                clear_depth: 0.0,
                 stencil_load_op: wgpu::LoadOp::Clear,
                 stencil_store_op: wgpu::StoreOp::Store,
                 clear_stencil: 0,
