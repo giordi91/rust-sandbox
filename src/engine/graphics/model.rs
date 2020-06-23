@@ -32,7 +32,7 @@ pub struct Mesh {
 }
 
 impl Mesh {
-    pub fn get_buffer_from_semantic(&self, semantic: MeshBufferSemantic) -> &MeshBufferMapper{
+    pub fn get_buffer_from_semantic(&self, semantic: MeshBufferSemantic) -> &MeshBufferMapper {
         for buffer in self.buffers.iter() {
             if buffer.semantic == semantic {
                 return buffer;
@@ -54,7 +54,7 @@ pub struct GltfFile {
 
 fn load_gltf_mesh_primitive(
     primitive: &gltf::Primitive,
-    raw_buffers: &HashMap<u32, wgpu::Buffer>,
+    raw_buffers: &mut HashMap<u32, wgpu::Buffer>,
 ) -> Mesh {
     let attributes = primitive.attributes();
 
@@ -146,6 +146,14 @@ fn load_gltf_mesh_primitive(
                 _ => panic!("unexpected datatype for index buffer"),
             };
 
+            //let us convert the buffer to u32
+            if is_uint16 {
+                //lets allocate a buffer big enough
+                let idx_buffer_32 = Vec::new();
+                idx_buffer_32.reserve(count as usize);
+
+            }
+
             let mesh_idx_buffer = MeshIndexBufferMapper {
                 offset: total_offset as u32,
                 length: view_len as u32,
@@ -162,7 +170,7 @@ fn load_gltf_mesh_primitive(
     mesh
 }
 
-fn load_gltf_mesh(mesh: &gltf::Mesh, raw_buffers: &HashMap<u32, wgpu::Buffer>) -> Vec<Mesh> {
+fn load_gltf_mesh(mesh: &gltf::Mesh, raw_buffers: &mut HashMap<u32, wgpu::Buffer>) -> Vec<Mesh> {
     let primitives = mesh.primitives();
     let mut meshes = Vec::new();
     for primitive in primitives {
@@ -210,9 +218,7 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
         let buffer_src = buffer.source();
 
         let buffer_uri = match buffer_src {
-            gltf::buffer::Source::Uri(uri) => {
-                uri
-            }
+            gltf::buffer::Source::Uri(uri) => uri,
             gltf::buffer::Source::Bin => panic!("gltf bin field of buffer is not supported yet"),
         };
 
@@ -237,7 +243,7 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
 
     let mut models = Vec::new();
     for mesh in gltf.meshes() {
-        let meshes = load_gltf_mesh(&mesh, &raw_buffers);
+        let meshes = load_gltf_mesh(&mesh, &mut raw_buffers);
 
         let model = Model { meshes };
         models.push(model);
