@@ -54,7 +54,8 @@ pub struct GltfFile {
 
 fn load_gltf_mesh_primitive(
     primitive: &gltf::Primitive,
-    raw_buffers: &mut HashMap<u32, wgpu::Buffer>,
+    gpu_raw_buffers: &mut HashMap<u32, wgpu::Buffer>,
+    raw_buffers: &HashMap<u32, Vec<u8>>,gpu_interfaces: &api::GPUInterfaces
 ) -> Mesh {
     let attributes = primitive.attributes();
 
@@ -101,8 +102,7 @@ fn load_gltf_mesh_primitive(
         let buffer = buffer_view.buffer();
         let buffer_idx = buffer.index();
         //just making sure the buffer is in the raw list
-        assert!(raw_buffers.contains_key(&(buffer_idx as u32)));
-
+        assert!(gpu_raw_buffers.contains_key(&(buffer_idx as u32)));
 
         //need to find the correct slice of the buffer
         let accessor_offset = accessor.offset();
@@ -130,14 +130,14 @@ fn load_gltf_mesh_primitive(
             //read the index buffer
             let buffer_view = idx_accessor.view().unwrap();
             let buffer = buffer_view.buffer();
-            let buffer_idx = buffer.index();
+            let mut buffer_idx = buffer.index();
             //just making sure the buffer is in the raw list
-            assert!(raw_buffers.contains_key(&(buffer_idx as u32)));
+            assert!(gpu_raw_buffers.contains_key(&(buffer_idx as u32)));
 
             let accessor_offset = idx_accessor.offset();
             let view_offset = buffer_view.offset();
-            let total_offset = accessor_offset + view_offset;
-            let view_len = buffer_view.length();
+            let mut total_offset = accessor_offset + view_offset;
+            let mut view_len = buffer_view.length();
             let count = idx_accessor.count() as u32;
 
             let is_uint16 = match idx_accessor.data_type() {
@@ -149,15 +149,43 @@ fn load_gltf_mesh_primitive(
             //let us convert the buffer to u32
             if is_uint16 {
                 //lets allocate a buffer big enough
-                let idx_buffer_32 = Vec::new();
+                let mut idx_buffer_32 = Vec::new();
                 idx_buffer_32.reserve(count as usize);
+                let raw_buffer = raw_buffers.get(&(buffer_idx as u32)).unwrap();
+                let indices : &[u16] =  bytemuck::cast_slice(&raw_buffer[total_offset..]);
+                for i in 0..count {
+                    idx_buffer_32.push(indices[i as usize] as u32);
+                }
+
+                //create a wgpu buffer
+                let wgpu_buffer = gpu_interfaces.device.create_buffer_with_data(
+                    bytemuck::cast_slice(&idx_buffer_32[..]),
+                    wgpu::BufferUsage::INDEX,
+                );
+
+                //NOTE this is a bit of a quirk, I am mostly not sure of the best way to keep track
+                //of buffer added,I should probably need a higher level structure or similar, for now to keep
+                //it simple I flip the last bit of the 32 bit version of the index, that would basically 
+                //signify we re-copied it and converted it. The possibility of a clash is really small, 
+                //since this is a mapping per gltf file. if we get to that many buffers we probably have 
+                //much bigger problems to deal with. I am not even sure the gpu allows to allocate that many 
+                //buffers
+                buffer_idx = buffer_idx | (1<<31);
+
+                //just making sure the buffer does not already exsits 
+                assert!(!gpu_raw_buffers.contains_key(&(buffer_idx as u32)));
+                gpu_raw_buffers.insert(buffer_idx as u32, wgpu_buffer);
+
+                total_offset = 0;
+                view_len = (count * 4) as usize;
+
 
             }
 
             let mesh_idx_buffer = MeshIndexBufferMapper {
                 offset: total_offset as u32,
                 length: view_len as u32,
-                is_uint16,
+                is_uint16: false,
                 buffer_idx: buffer_idx as u32,
                 count,
             };
@@ -170,11 +198,15 @@ fn load_gltf_mesh_primitive(
     mesh
 }
 
-fn load_gltf_mesh(mesh: &gltf::Mesh, raw_buffers: &mut HashMap<u32, wgpu::Buffer>) -> Vec<Mesh> {
+fn load_gltf_mesh(
+    mesh: &gltf::Mesh,
+    gpu_raw_buffers: &mut HashMap<u32, wgpu::Buffer>,
+    raw_buffers: &HashMap<u32, Vec<u8>>,gpu_interfaces: &api::GPUInterfaces
+) -> Vec<Mesh> {
     let primitives = mesh.primitives();
     let mut meshes = Vec::new();
     for primitive in primitives {
-        let mesh = load_gltf_mesh_primitive(&primitive, raw_buffers);
+        let mesh = load_gltf_mesh_primitive(&primitive, gpu_raw_buffers,raw_buffers, gpu_interfaces);
         meshes.push(mesh);
     }
 
@@ -210,6 +242,7 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
     */
 
     let mut raw_buffers = HashMap::new();
+    let mut gpu_raw_buffers = HashMap::new();
 
     //let us first load all the buffers
     for buffer in gltf.buffers() {
@@ -238,12 +271,13 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
             wgpu::BufferUsage::INDEX | wgpu::BufferUsage::VERTEX,
         );
 
-        raw_buffers.insert(buffer_idx as u32, wgpu_buffer);
+        raw_buffers.insert(buffer_idx as u32, buffer_content);
+        gpu_raw_buffers.insert(buffer_idx as u32, wgpu_buffer);
     }
 
     let mut models = Vec::new();
     for mesh in gltf.meshes() {
-        let meshes = load_gltf_mesh(&mesh, &mut raw_buffers);
+        let meshes = load_gltf_mesh(&mesh, &mut gpu_raw_buffers, &raw_buffers, gpu_interfaces);
 
         let model = Model { meshes };
         models.push(model);
@@ -251,6 +285,6 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
 
     GltfFile {
         models,
-        buffers: raw_buffers,
+        buffers: gpu_raw_buffers,
     }
 }
