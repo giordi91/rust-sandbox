@@ -214,8 +214,9 @@ impl PipelineManager {
         let color_states =
             get_pipeline_color_states(&pipe_content_json, gpu_interfaces.sc_desc.format);
 
+        let layout_name = pipe_content_json["layout"].as_str().unwrap();
         let bg_layout_handle = self
-            .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
+            .load_binding_group(layout_name, gpu_interfaces)
             .await;
 
         let bg_layout = self.get_bind_group_from_handle(bg_layout_handle);
@@ -229,6 +230,7 @@ impl PipelineManager {
 
         let vertex_state_type = pipe_content_json["vertex_state"]["type"].as_str().unwrap();
         let desc = get_vertex_attrbibute_descriptor(vertex_state_type);
+        println!("{} {}", vertex_state_type,desc.len());
 
         gpu_interfaces
             .device
@@ -325,6 +327,7 @@ fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescrip
                 }],
             },
         ],
+        "none" =>  Vec::new(),
         _ => panic!("could not find {} vertex description", name),
     }
 }

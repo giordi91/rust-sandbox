@@ -56,14 +56,14 @@ impl platform::Application for HelloTriangle {
         let layout_handle = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
+            .load_binding_group("resources/examples/hello-triangle/hello-triangle.bg", gpu_interfaces)
             .await;
 
         let render_pipeline_handle = engine_runtime
             .resource_managers
             .pipeline_manager
             .load_pipeline(
-                "resources/hello-triangle.pipeline",
+                "resources/examples/hello-triangle/hello-triangle.pipeline",
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
                 wgpu::TextureFormat::Depth32Float

@@ -1,18 +1,18 @@
 {
     "type": "raster",
-    "layout" : "hello-triangle.bg",
+    "layout" : "resources/examples/hello-triangle/hello-triangle.bg",
     "vertex": {
-        "shader_name": "resources/shader"
+        "shader_name": "resources/examples/hello-triangle/hello-triangle"
     },
     "fragment": {
-        "shader_name": "resources/shader"
+        "shader_name": "resources/examples/hello-triangle/hello-triangle"
     },
     "rasterization_state": {
         "type": "default"
     },
     "primitive_topology": "triangleList",
     "vertex_state": {
-        "type" : "position_normal"
+        "type" : "none"
     },
     "color_states": [
         {

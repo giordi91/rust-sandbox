@@ -1,6 +1,6 @@
 {
     "type": "raster",
-    "layout": "hello-triangle.bg",
+    "layout": "resources/gltf_model.bg",
     "vertex": {
         "shader_name": "resources/shader"
     },

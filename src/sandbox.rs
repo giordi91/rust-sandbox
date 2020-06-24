@@ -56,7 +56,7 @@ impl platform::Application for Sandbox {
         let layout_handle = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group("resources/hello-triangle.bg", gpu_interfaces)
+            .load_binding_group("resources/gltf_model.bg", gpu_interfaces)
             .await;
 
         let default_depth_format = wgpu::TextureFormat::Depth32Float;

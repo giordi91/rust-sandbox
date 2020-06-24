@@ -1,0 +1,13 @@
+{
+    "type": "raster",
+    "bindings": [
+        {
+            "slot": 0,
+            "visibility": [
+                "vertex"
+            ],
+            "type": "uniform",
+            "dynamic": false
+        }
+    ]
+}
