@@ -5,7 +5,7 @@ use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
-pub struct Sandbox {
+pub struct GLTFModel {
     engine_runtime: platform::EngineRuntime,
     render_pipeline_handle: handle::ResourceHandle,
     camera: graphics::camera::Camera,
@@ -22,7 +22,7 @@ pub struct Sandbox {
 }
 
 #[async_trait(?Send)]
-impl platform::Application for Sandbox {
+impl platform::Application for GLTFModel {
     async fn new(window: &Window, mut engine_runtime: platform::EngineRuntime) -> Self {
         let size = window.inner_size();
 
@@ -71,8 +71,6 @@ impl platform::Application for Sandbox {
                 default_depth_format,
             )
             .await;
-
-        platform::core::to_console("NEW3!");
 
         let bg_layout = engine_runtime
             .resource_managers
@@ -180,7 +178,7 @@ impl platform::Application for Sandbox {
             .gpu_interfaces
             .device
             .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("update encoder"),
+                label: Some("rendering encoder"),
             });
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
@@ -265,4 +263,10 @@ impl platform::Application for Sandbox {
             .submit(command_buffers);
         
     }
+}
+
+
+fn main()
+{
+    platform::run_application::<GLTFModel>("GLTF Model v1.0.0");
 }

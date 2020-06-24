@@ -1,0 +1,33 @@
+{
+    "type": "raster",
+    "layout": "resources/examples/gltf-model/gltf_model.bg",
+    "vertex": {
+        "shader_name": "resources/shader"
+    },
+    "fragment": {
+        "shader_name": "resources/shader"
+    },
+    "rasterization_state": {
+        "type": "default"
+    },
+    "primitive_topology": "triangleList",
+    "vertex_state": {
+        "type": "position_normal"
+    },
+    "color_states": [
+        {
+            "format": "swap_chain_native",
+            "color_blend": "replace",
+            "alpha_blend": "replace"
+        }
+    ],
+    "depth_state": {
+        "format": "default",
+        "depth_write_enabled": true,
+        "depth_compare": "Greater",
+        "stencil_front": "Ignore",
+        "stencil_back": "Ignore",
+        "stencil_read_mask": 0,
+        "stencil_write_mask": 0
+    }
+}
