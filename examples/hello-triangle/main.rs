@@ -64,10 +64,9 @@ impl platform::Application for HelloTriangle {
             .pipeline_manager
             .load_pipeline(
                 "resources/hello-triangle.pipeline",
-                graphics::bindings::PipelineConfig{index_buffer_uint16: true},
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
-                //&uniform_bind_group_layout,
+                wgpu::TextureFormat::Depth32Float
             )
             .await;
 
@@ -118,7 +117,7 @@ impl platform::Application for HelloTriangle {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
+    fn update(&mut self, command_buffers : &mut Vec<wgpu::CommandBuffer> ) {
         //let us update time
         let curr_time = platform::core::get_time_in_micro();
         self.delta_time = curr_time - self.time_stamp;
@@ -155,16 +154,10 @@ impl platform::Application for HelloTriangle {
             std::mem::size_of::<graphics::FrameData>() as wgpu::BufferAddress,
         );
 
-        // We need to remember to submit our CommandEncoder's output
-        // otherwise we won't see any change.
-        //self.queue.submit(&[encoder.finish()]);
-        self.engine_runtime
-            .gpu_interfaces
-            .queue
-            .submit(Some(encoder.finish()));
+        command_buffers.push(encoder.finish());
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer> ) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
             .engine_runtime
@@ -216,10 +209,11 @@ impl platform::Application for HelloTriangle {
         //self.queue.submit(&[
         //    encoder.finish()
         //]);
+        command_buffers.push(encoder.finish());
         self.engine_runtime
             .gpu_interfaces
             .queue
-            .submit(Some(encoder.finish()));
+            .submit(command_buffers);
     }
 }
 

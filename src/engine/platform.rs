@@ -39,8 +39,8 @@ pub trait Application: 'static + Sized {
     async fn new(window: &Window, engine_runtime: EngineRuntime) -> Self;
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
     fn input(&mut self, event: &WindowEvent) -> bool;
-    fn update(&mut self);
-    fn render(&mut self);
+    fn update(&mut self,command_buffers: &mut Vec<wgpu::CommandBuffer>);
+    fn render(&mut self,command_buffers: Vec<wgpu::CommandBuffer>);
 }
 
 
@@ -96,8 +96,10 @@ async fn run<T: Application>(
                 }
             }
             Event::RedrawRequested(_) => {
-                app.update();
-                app.render();
+                let mut buffers = Vec::new();
+                app.update(&mut buffers);
+                app.render(buffers);
+
             }
             Event::MainEventsCleared => {
                 // RedrawRequested will only trigger once, unless we manually

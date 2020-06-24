@@ -163,6 +163,7 @@ fn load_gltf_mesh_primitive(
                     idx_buffer_32.push(indices[i as usize] as u32);
                 }
 
+
                 //create a wgpu buffer
                 let wgpu_buffer = gpu_interfaces.device.create_buffer_with_data(
                     bytemuck::cast_slice(&idx_buffer_32[..]),

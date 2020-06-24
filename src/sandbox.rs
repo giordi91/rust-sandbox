@@ -68,7 +68,7 @@ impl platform::Application for Sandbox {
                 "resources/gltf_model.pipeline",
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
-                default_depth_format
+                default_depth_format,
             )
             .await;
 
@@ -134,7 +134,7 @@ impl platform::Application for Sandbox {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self) {
+    fn update(&mut self,  command_buffers: &mut Vec<wgpu::CommandBuffer>) {
         //let us update time
         let curr_time = platform::core::get_time_in_micro();
         self.delta_time = curr_time - self.time_stamp;
@@ -145,8 +145,6 @@ impl platform::Application for Sandbox {
             .update_camera(&mut self.camera, self.delta_time);
         self.per_frame_data.update_view_proj(&self.camera);
 
-        // Copy operation's are performed on the gpu, so we'll need
-        // a CommandEncoder for that
         let mut encoder = self
             .engine_runtime
             .gpu_interfaces
@@ -172,16 +170,18 @@ impl platform::Application for Sandbox {
             std::mem::size_of::<graphics::FrameData>() as wgpu::BufferAddress,
         );
 
-        // We need to remember to submit our CommandEncoder's output
-        // otherwise we won't see any change.
-        //self.queue.submit(&[encoder.finish()]);
-        self.engine_runtime
-            .gpu_interfaces
-            .queue
-            .submit(Some(encoder.finish()));
+        command_buffers.push(encoder.finish());
     }
 
-    fn render(&mut self) {
+    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer>) {
+
+        let mut encoder = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("update encoder"),
+            });
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
             .engine_runtime
@@ -190,18 +190,8 @@ impl platform::Application for Sandbox {
             .get_next_texture()
             .expect("Timeout getting texture");
 
-        //this is the command buffer we use to record commands
-        let mut encoder = self
-            .engine_runtime
-            .gpu_interfaces
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("Render Encoder"),
-            });
-
         {
-
-            let depth_stencil_attachment =Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+            let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
                 attachment: &self.depth_texture.view,
                 depth_load_op: wgpu::LoadOp::Clear,
                 depth_store_op: wgpu::StoreOp::Store,
@@ -209,8 +199,7 @@ impl platform::Application for Sandbox {
                 stencil_load_op: wgpu::LoadOp::Clear,
                 stencil_store_op: wgpu::StoreOp::Store,
                 clear_stencil: 0,
-            }) ;
-
+            });
 
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -269,13 +258,11 @@ impl platform::Application for Sandbox {
             self.color = 0.0;
         }
 
-        //new way to submit, when i will be able to move to master branch again
-        //self.queue.submit(&[
-        //    encoder.finish()
-        //]);
+        command_buffers.push(encoder.finish());
         self.engine_runtime
             .gpu_interfaces
             .queue
-            .submit(Some(encoder.finish()));
+            .submit(command_buffers);
+        
     }
 }
