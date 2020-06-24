@@ -26,7 +26,7 @@ An example would be, the engine helps you load shaders, meshes and so on, but th
 
 This technology stack is on its early days, as such compiling and running is fiddly and a bit messy, hopefully should improve quickly.
 
-The project has been developed on both windows and mac, on Vulkan and metal backends respectively. If you have issues on any platform let me know.
+The project has been developed on both Windows and Mac, on Vulkan and Metal backends respectively. If you have issues on any platform let me know.
 
 **NOTE**
 The sandbox is the project I use for development, so might not work or be broken or who knows what state it is in. What you want to build and run are the examples. 
