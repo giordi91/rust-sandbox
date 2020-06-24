@@ -219,5 +219,5 @@ impl platform::Application for HelloTriangle {
 
 fn main()
 {
-    platform::run_application::<HelloTriangle>("HelloTriangle v1.0.0");
+    platform::run_application::<HelloTriangle>("HelloTriangle v1.1.0");
 }
