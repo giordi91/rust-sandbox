@@ -289,28 +289,58 @@ pub async fn load_gltf_file(
         gpu_raw_buffers.push(gpu_buff_handle);
     }
 
-    let gltf_nodes = gltf.scenes().nth(0).unwrap().nodes();
-
     let mut models = Vec::new();
-    for mesh in gltf.meshes() {
-        let meshes = load_gltf_mesh(
-            &mesh,
-            &gpu_raw_buffers,
-            &raw_buffers,
-            gpu_interfaces,
-            buffer_manager,
-        );
 
-        //load the transformation
-        let matrix = load_transformation(&mesh, &gltf_nodes);
+    for scene in gltf.scenes() {
+        //scene
+        for node in scene.nodes() {
+            if let Some(curr_mesh) = node.mesh() {
+                //we have the correct node let us extract the mesh
+                let transform = node.transform().matrix();
+                let c0 = cgmath::vec4(transform[0][0],transform[0][1],transform[0][2],transform[0][3]);
+                let c1 = cgmath::vec4(transform[1][0],transform[1][1],transform[1][2],transform[1][3]);
+                let c2 = cgmath::vec4(transform[2][0],transform[2][1],transform[2][2],transform[2][3]);
+                let c3 = cgmath::vec4(transform[3][0],transform[3][1],transform[3][2],transform[3][3]);
 
-        let model = Model { meshes, matrix };
-        models.push(model);
+                let matrix = cgmath::Matrix4::from_cols(c0, c1, c2, c3);
+
+                let meshes = load_gltf_mesh(
+                    &curr_mesh,
+                    &gpu_raw_buffers,
+                    &raw_buffers,
+                    gpu_interfaces,
+                    buffer_manager,
+                );
+
+                let model = Model { meshes, matrix };
+                models.push(model);
+            }
+        }
     }
 
     GltfFile { models }
 }
 
-fn load_transformation(mesh: &gltf::Mesh, gltf_nodes: &gltf::scene::iter::Nodes) -> cgmath::Matrix4<f32> {
+/*
+fn load_transformation(
+    mesh: &gltf::Mesh,
+    mesh_index: u32,
+    gltf_scene: &gltf::Scene,
+) -> cgmath::Matrix4<f32> {
+
+    let mesh_idx = mesh.index();
+    for node in gltf_scene.nodes(){
+
+        if let  Some(curr_mesh)= node.mesh()
+        {
+            if curr_mesh.index() != mesh_idx
+            {
+                continue;
+            }
+            //we have the correct node let us extract the mesh
+            node.transform()
+        }
+    }
     cgmath::prelude::SquareMatrix::identity()
 }
+*/
