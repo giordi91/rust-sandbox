@@ -229,45 +229,48 @@ impl platform::Application for Sandbox {
             render_pass.set_pipeline(&render_pipeline.unwrap());
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
-            let model = self.gltf_file.models.get(0).unwrap();
-            let mesh = model.meshes.get(0).unwrap();
-            let pos_mapper =
-                mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
-            let pos_idx = pos_mapper.buffer_idx;
-            let pos_buff = self
-                .engine_runtime
-                .resource_managers
-                .buffer_manager
-                .get_buffer_from_handle(&pos_idx);
-
-            let n_mapper =
-                mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
-            let n_idx = n_mapper.buffer_idx;
-            let n_buff = self
-                .engine_runtime
-                .resource_managers
-                .buffer_manager
-                .get_buffer_from_handle(&n_idx);
-
-            let mut idx_count = 0;
-            match &mesh.index_buffer {
-                Some(idx_buff_map) => {
-                    let idx = idx_buff_map.buffer_idx;
-                    let idx_buff = self
+            let models = &self.gltf_file.models;
+            for model in models {
+                for mesh in model.meshes.iter() {
+                    let pos_mapper = mesh
+                        .get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
+                    let pos_idx = pos_mapper.buffer_idx;
+                    let pos_buff = self
                         .engine_runtime
                         .resource_managers
                         .buffer_manager
-                        .get_buffer_from_handle(&idx);
+                        .get_buffer_from_handle(&pos_idx);
 
-                    render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
-                    idx_count = idx_buff_map.count;
+                    let n_mapper =
+                        mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
+                    let n_idx = n_mapper.buffer_idx;
+                    let n_buff = self
+                        .engine_runtime
+                        .resource_managers
+                        .buffer_manager
+                        .get_buffer_from_handle(&n_idx);
+
+                    let mut idx_count = 0;
+                    match &mesh.index_buffer {
+                        Some(idx_buff_map) => {
+                            let idx = idx_buff_map.buffer_idx;
+                            let idx_buff = self
+                                .engine_runtime
+                                .resource_managers
+                                .buffer_manager
+                                .get_buffer_from_handle(&idx);
+
+                            render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
+                            idx_count = idx_buff_map.count;
+                        }
+                        None => {}
+                    }
+
+                    render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
+                    render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
+                    render_pass.draw_indexed(0..idx_count, 0, 0..1);
                 }
-                None => {}
             }
-
-            render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
-            render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
-            render_pass.draw_indexed(0..idx_count, 0, 0..1);
         }
 
         self.color += 0.001;
