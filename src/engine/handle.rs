@@ -2,10 +2,11 @@
 #[derive(PartialEq, Debug)]
 pub enum ResourceHandleType {
     Shader = 1,
-    Texture= 2,
+    Texture = 2,
     Mesh = 3,
-    BindingGroup= 4,
-    RenderPipeline= 5,
+    BindingGroup = 4,
+    RenderPipeline = 5,
+    Buffer = 6,
     Invalid = !0,
 }
 
@@ -15,6 +16,7 @@ pub const HANDLE_TYPE_BIT_COUNT: u64 = 10;
 const HANDLE_TYPE_MASK_BIT_RANGE: u64 = (1 << HANDLE_TYPE_BIT_COUNT) - 1;
 const HANDLE_TYPE_MASK_FLAG: u64 = HANDLE_TYPE_MASK_BIT_RANGE << (64 - HANDLE_TYPE_BIT_COUNT);
 
+#[derive(Copy, Clone,std::cmp::Eq, std::cmp::PartialEq, Hash)]
 pub struct ResourceHandle {
     data: u64,
 }

@@ -4,6 +4,7 @@ use winit::{
 
 use super::shader::ShaderManager;
 use super::bindings::PipelineManager;
+use super::buffer::BufferManager;
 
 pub struct GPUInterfaces {
     pub _instance: wgpu::Instance,
@@ -20,6 +21,7 @@ pub struct ResourceManagers
 {
     pub shader_manager : ShaderManager,
     pub pipeline_manager : PipelineManager, 
+    pub buffer_manager : BufferManager,
 }
 
 impl GPUInterfaces {

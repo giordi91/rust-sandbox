@@ -56,7 +56,10 @@ impl platform::Application for Sandbox {
         let layout_handle = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group("resources/examples/gltf-model/gltf_model.bg", gpu_interfaces)
+            .load_binding_group(
+                "resources/examples/gltf-model/gltf_model.bg",
+                gpu_interfaces,
+            )
             .await;
 
         let default_depth_format = wgpu::TextureFormat::Depth32Float;
@@ -97,6 +100,7 @@ impl platform::Application for Sandbox {
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/examples/gltf-model/Suzanne.gltf",
+            //"resources/aoScene/aoScene.gltf",
             &gpu_interfaces,
         )
         .await;
@@ -134,7 +138,7 @@ impl platform::Application for Sandbox {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self,  command_buffers: &mut Vec<wgpu::CommandBuffer>) {
+    fn update(&mut self, command_buffers: &mut Vec<wgpu::CommandBuffer>) {
         //let us update time
         let curr_time = platform::core::get_time_in_micro();
         self.delta_time = curr_time - self.time_stamp;
@@ -174,7 +178,6 @@ impl platform::Application for Sandbox {
     }
 
     fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer>) {
-
         let mut encoder = self
             .engine_runtime
             .gpu_interfaces
@@ -230,18 +233,30 @@ impl platform::Application for Sandbox {
             let pos_mapper =
                 mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
             let pos_idx = pos_mapper.buffer_idx;
-            let pos_buff = self.gltf_file.buffers.get(&pos_idx).unwrap();
+            let pos_buff = self
+                .gltf_file
+                .buffers
+                .get(&handle::ResourceHandle::from_data(pos_idx))
+                .unwrap();
 
             let n_mapper =
                 mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
             let n_idx = n_mapper.buffer_idx;
-            let n_buff = self.gltf_file.buffers.get(&n_idx).unwrap();
+            let n_buff = self
+                .gltf_file
+                .buffers
+                .get(&handle::ResourceHandle::from_data(n_idx))
+                .unwrap();
 
             let mut idx_count = 0;
             match &mesh.index_buffer {
                 Some(idx_buff_map) => {
                     let idx = idx_buff_map.buffer_idx;
-                    let idx_buff = self.gltf_file.buffers.get(&idx).unwrap();
+                    let idx_buff = self
+                        .gltf_file
+                        .buffers
+                        .get(&handle::ResourceHandle::from_data(idx))
+                        .unwrap();
                     render_pass.set_index_buffer(idx_buff, idx_buff_map.offset as u64, 0);
                     idx_count = idx_buff_map.count;
                 }
@@ -263,6 +278,5 @@ impl platform::Application for Sandbox {
             .gpu_interfaces
             .queue
             .submit(command_buffers);
-        
     }
 }
