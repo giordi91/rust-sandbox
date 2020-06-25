@@ -17,7 +17,7 @@ pub struct MeshBufferMapper {
     pub semantic: MeshBufferSemantic,
     pub offset: u32,
     pub length: u32,
-    pub buffer_idx:  handle::ResourceHandle,
+    pub buffer_idx: handle::ResourceHandle,
 }
 
 pub struct MeshIndexBufferMapper {
@@ -48,6 +48,7 @@ impl Mesh {
 
 pub struct Model {
     pub meshes: Vec<Mesh>,
+    pub matrix: cgmath::Matrix4<f32>,
 }
 
 pub struct GltfFile {
@@ -228,6 +229,8 @@ pub async fn load_gltf_file(
         .await
         .unwrap();
     let gltf = gltf::Gltf::from_slice(&gltf_content[..]).unwrap();
+
+    //assert!(gltf.scenes().len() == 0, "only one scene is supported for now on in the gltf loader");
     /*
     for scene in gltf.scenes() {
         //scene
@@ -286,6 +289,8 @@ pub async fn load_gltf_file(
         gpu_raw_buffers.push(gpu_buff_handle);
     }
 
+    let gltf_nodes = gltf.scenes().nth(0).unwrap().nodes();
+
     let mut models = Vec::new();
     for mesh in gltf.meshes() {
         let meshes = load_gltf_mesh(
@@ -296,9 +301,16 @@ pub async fn load_gltf_file(
             buffer_manager,
         );
 
-        let model = Model { meshes };
+        //load the transformation
+        let matrix = load_transformation(&mesh, &gltf_nodes);
+
+        let model = Model { meshes, matrix };
         models.push(model);
     }
 
     GltfFile { models }
+}
+
+fn load_transformation(mesh: &gltf::Mesh, gltf_nodes: &gltf::scene::iter::Nodes) -> cgmath::Matrix4<f32> {
+    cgmath::prelude::SquareMatrix::identity()
 }
