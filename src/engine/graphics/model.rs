@@ -57,7 +57,7 @@ pub struct GltfFile {
 fn load_gltf_mesh_primitive(
     primitive: &gltf::Primitive,
     gpu_raw_buffers: &Vec<handle::ResourceHandle>,
-    raw_buffers: &HashMap<handle::ResourceHandle, Vec<u8>>,
+    raw_buffers: &HashMap<u32, Vec<u8>>,
     gpu_interfaces: &api::GPUInterfaces,
     buffer_manager: &mut buffer::BufferManager,
 ) -> Mesh {
@@ -161,11 +161,8 @@ fn load_gltf_mesh_primitive(
                 //lets allocate a buffer big enough
                 let mut idx_buffer_32 = Vec::new();
                 idx_buffer_32.reserve(count as usize);
-                let idx_buff_handle = handle::ResourceHandle::new(
-                    handle::ResourceHandleType::Buffer,
-                    buffer_idx_gltf as u64,
-                );
-                let raw_buffer = raw_buffers.get(&(idx_buff_handle)).unwrap();
+
+                let raw_buffer = raw_buffers.get(&(buffer_idx_gltf as u32)).unwrap();
                 let indices: &[u16] = bytemuck::cast_slice(&raw_buffer[total_offset..]);
                 for i in 0..count {
                     idx_buffer_32.push(indices[i as usize] as u32);
@@ -202,7 +199,7 @@ fn load_gltf_mesh_primitive(
 fn load_gltf_mesh(
     mesh: &gltf::Mesh,
     gpu_raw_buffers: &Vec<handle::ResourceHandle>,
-    raw_buffers: &HashMap<handle::ResourceHandle, Vec<u8>>,
+    raw_buffers: &HashMap<u32, Vec<u8>>,
     gpu_interfaces: &api::GPUInterfaces,
     buffer_manager: &mut buffer::BufferManager,
 ) -> Vec<Mesh> {
@@ -285,10 +282,7 @@ pub async fn load_gltf_file(
             gpu_interfaces,
         );
 
-
-        let buff_handle =
-            handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
-        raw_buffers.insert(buff_handle, buffer_content);
+        raw_buffers.insert(buffer_idx as u32, buffer_content);
         gpu_raw_buffers.push(gpu_buff_handle);
     }
 
