@@ -26,13 +26,12 @@ impl BufferManager {
         handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, self.buffer_counter)
     }
 
-    pub fn get_buffer_from_handle(&self, raw_handle: u64) -> &wgpu::Buffer {
-        let curr_handle = handle::ResourceHandle::from_data(raw_handle);
-        let handle_type = curr_handle.get_type();
+    pub fn get_buffer_from_handle(&self, buff_handle: &handle::ResourceHandle) -> &wgpu::Buffer {
+        let handle_type = buff_handle.get_type();
         assert!(
             handle_type == handle::ResourceHandleType::Buffer,
             "provided handle is not a Buffer handle"
         );
-        self.buffers_mapper.get(&curr_handle.get_value()).unwrap()
+        self.buffers_mapper.get(&buff_handle.get_value()).unwrap()
     }
 }

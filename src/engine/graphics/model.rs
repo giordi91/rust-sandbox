@@ -17,14 +17,14 @@ pub struct MeshBufferMapper {
     pub semantic: MeshBufferSemantic,
     pub offset: u32,
     pub length: u32,
-    pub buffer_idx: u64,
+    pub buffer_idx:  handle::ResourceHandle,
 }
 
 pub struct MeshIndexBufferMapper {
     pub offset: u32,
     pub length: u32,
     pub is_uint16: bool,
-    pub buffer_idx: u64,
+    pub buffer_idx: handle::ResourceHandle,
     pub count: u32,
 }
 
@@ -124,7 +124,7 @@ fn load_gltf_mesh_primitive(
             semantic: wgpu_semantic,
             offset: total_offset as u32,
             length: view_len as u32,
-            buffer_idx: buff_handle.raw(),
+            buffer_idx: buff_handle.clone(),
         };
 
         mesh.buffers.push(mesh_buffer);
@@ -142,7 +142,7 @@ fn load_gltf_mesh_primitive(
             let buffer_idx_gltf = buffer.index();
 
             let ori_handle = gpu_raw_buffers.get(buffer_idx_gltf).unwrap();
-            let mut buffer_idx = ori_handle.raw();
+            let mut buffer_idx = ori_handle.clone();
 
             let accessor_offset = idx_accessor.offset();
             let view_offset = buffer_view.offset();
@@ -175,7 +175,7 @@ fn load_gltf_mesh_primitive(
                     gpu_interfaces,
                 );
 
-                buffer_idx = buff_handle.raw();
+                buffer_idx = buff_handle;
                 total_offset = 0;
                 view_len = (count * 4) as usize;
             }
