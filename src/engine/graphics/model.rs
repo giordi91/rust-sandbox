@@ -1,6 +1,7 @@
 use super::super::handle;
 use super::super::platform;
 use super::api;
+use super::buffer;
 
 use std::collections::HashMap;
 
@@ -51,14 +52,14 @@ pub struct Model {
 
 pub struct GltfFile {
     pub models: Vec<Model>,
-    pub buffers: HashMap<handle::ResourceHandle, wgpu::Buffer>,
 }
 
 fn load_gltf_mesh_primitive(
     primitive: &gltf::Primitive,
-    gpu_raw_buffers: &mut HashMap<handle::ResourceHandle, wgpu::Buffer>,
+    gpu_raw_buffers: &mut HashMap<handle::ResourceHandle, handle::ResourceHandle>,
     raw_buffers: &HashMap<handle::ResourceHandle, Vec<u8>>,
     gpu_interfaces: &api::GPUInterfaces,
+    buffer_manager: &mut buffer::BufferManager,
 ) -> Mesh {
     let attributes = primitive.attributes();
 
@@ -111,8 +112,10 @@ fn load_gltf_mesh_primitive(
         let buffer_idx = buffer.index();
         //just making sure the buffer is in the raw list
 
-        let buff_handle = handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
-        assert!(gpu_raw_buffers.contains_key(&(buff_handle)));
+        let tmp_buff_handle =
+            handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
+        assert!(gpu_raw_buffers.contains_key(&(tmp_buff_handle)));
+        let buff_handle = gpu_raw_buffers.get(&tmp_buff_handle).unwrap();
 
         //need to find the correct slice of the buffer
         let accessor_offset = accessor.offset();
@@ -140,11 +143,15 @@ fn load_gltf_mesh_primitive(
             //read the index buffer
             let buffer_view = idx_accessor.view().unwrap();
             let buffer = buffer_view.buffer();
-            let mut buffer_idx_gltf = buffer.index();
+            let buffer_idx_gltf = buffer.index();
             //just making sure the buffer is in the raw list
-            let idx_buff_handle = handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx_gltf as u64);
+            let idx_buff_handle = handle::ResourceHandle::new(
+                handle::ResourceHandleType::Buffer,
+               buffer_idx_gltf as u64,
+            );
+            let ori_handle = gpu_raw_buffers.get(&idx_buff_handle).unwrap();
             assert!(gpu_raw_buffers.contains_key(&(idx_buff_handle)));
-            let mut buffer_idx = idx_buff_handle.raw();
+            let mut buffer_idx = ori_handle.raw();
 
             let accessor_offset = idx_accessor.offset();
             let view_offset = buffer_view.offset();
@@ -163,7 +170,10 @@ fn load_gltf_mesh_primitive(
                 //lets allocate a buffer big enough
                 let mut idx_buffer_32 = Vec::new();
                 idx_buffer_32.reserve(count as usize);
-                let idx_buff_handle = handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
+                let idx_buff_handle = handle::ResourceHandle::new(
+                    handle::ResourceHandleType::Buffer,
+                    buffer_idx_gltf as u64,
+                );
                 let raw_buffer = raw_buffers.get(&(idx_buff_handle)).unwrap();
                 let indices: &[u16] = bytemuck::cast_slice(&raw_buffer[total_offset..]);
                 for i in 0..count {
@@ -171,26 +181,13 @@ fn load_gltf_mesh_primitive(
                 }
 
                 //create a wgpu buffer
-                let wgpu_buffer = gpu_interfaces.device.create_buffer_with_data(
+                let buff_handle= buffer_manager.create_buffer_with_data(
                     bytemuck::cast_slice(&idx_buffer_32[..]),
                     wgpu::BufferUsage::INDEX,
+                    gpu_interfaces
                 );
 
-                //NOTE this is a bit of a quirk, I am mostly not sure of the best way to keep track
-                //of buffer added,I should probably need a higher level structure or similar, for now to keep
-                //it simple I flip the last bit of the 32 bit version of the index, that would basically
-                //signify we re-copied it and converted it. The possibility of a clash is really small,
-                //since this is a mapping per gltf file. if we get to that many buffers we probably have
-                //much bigger problems to deal with. I am not even sure the gpu allows to allocate that many
-                //buffers
-                buffer_idx = buffer_idx | (1 << 31);
-
-                //just making sure the buffer does not already exsits
-                let new_idx_buff_handle = handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
-                assert!(!gpu_raw_buffers.contains_key(&(new_idx_buff_handle)));
-                gpu_raw_buffers.insert(new_idx_buff_handle, wgpu_buffer);
-                buffer_idx = new_idx_buff_handle.raw();
-
+                buffer_idx = buff_handle.raw();
                 total_offset = 0;
                 view_len = (count * 4) as usize;
             }
@@ -213,22 +210,27 @@ fn load_gltf_mesh_primitive(
 
 fn load_gltf_mesh(
     mesh: &gltf::Mesh,
-    gpu_raw_buffers: &mut HashMap<handle::ResourceHandle, wgpu::Buffer>,
+    gpu_raw_buffers: &mut HashMap<handle::ResourceHandle, handle::ResourceHandle>,
     raw_buffers: &HashMap<handle::ResourceHandle, Vec<u8>>,
     gpu_interfaces: &api::GPUInterfaces,
+    buffer_manager: &mut buffer::BufferManager,
 ) -> Vec<Mesh> {
     let primitives = mesh.primitives();
     let mut meshes = Vec::new();
     for primitive in primitives {
         let mesh =
-            load_gltf_mesh_primitive(&primitive, gpu_raw_buffers, raw_buffers, gpu_interfaces);
+            load_gltf_mesh_primitive(&primitive, gpu_raw_buffers, raw_buffers, gpu_interfaces, buffer_manager);
         meshes.push(mesh);
     }
 
     meshes
 }
 
-pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces) -> GltfFile {
+pub async fn load_gltf_file(
+    file_name: &str,
+    gpu_interfaces: &api::GPUInterfaces,
+    buffer_manager: &mut buffer::BufferManager,
+) -> GltfFile {
     let gltf_content = platform::file_system::load_file_u8(file_name)
         .await
         .unwrap();
@@ -281,20 +283,25 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
             .await
             .unwrap();
 
-        let wgpu_buffer = gpu_interfaces.device.create_buffer_with_data(
+        //let wgpu_buffer = gpu_interfaces.device.create_buffer_with_data(
+        //    bytemuck::cast_slice(&buffer_content[..]),
+        //    wgpu::BufferUsage::INDEX | wgpu::BufferUsage::VERTEX,
+        //);
+        let gpu_buff_handle= buffer_manager.create_buffer_with_data(
             bytemuck::cast_slice(&buffer_content[..]),
             wgpu::BufferUsage::INDEX | wgpu::BufferUsage::VERTEX,
+            gpu_interfaces,
         );
 
-        let buff_handle=
+        let buff_handle =
             handle::ResourceHandle::new(handle::ResourceHandleType::Buffer, buffer_idx as u64);
         raw_buffers.insert(buff_handle, buffer_content);
-        gpu_raw_buffers.insert(buff_handle, wgpu_buffer);
+        gpu_raw_buffers.insert(buff_handle, gpu_buff_handle);
     }
 
     let mut models = Vec::new();
     for mesh in gltf.meshes() {
-        let meshes = load_gltf_mesh(&mesh, &mut gpu_raw_buffers, &raw_buffers, gpu_interfaces);
+        let meshes = load_gltf_mesh(&mesh, &mut gpu_raw_buffers, &raw_buffers, gpu_interfaces, buffer_manager);
 
         let model = Model { meshes };
         models.push(model);
@@ -302,6 +309,5 @@ pub async fn load_gltf_file(file_name: &str, gpu_interfaces: &api::GPUInterfaces
 
     GltfFile {
         models,
-        buffers: gpu_raw_buffers,
     }
 }
