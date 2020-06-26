@@ -1,0 +1,44 @@
+{
+    "type": "raster",
+    "bindings": [
+        [
+            {
+                "comment": "this is the per frame data, like the camera",
+                "slot": 0,
+                "visibility": [
+                    "vertex"
+                ],
+                "type": "uniform",
+                "dynamic": false
+            }
+        ],
+        [
+            {
+                "comment": "this is the depth texture we want to sample",
+                "slot": 0,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "texture",
+                "dynamic": false,
+                "texture_config": {
+                    "multisampled": false,
+                    "dimension": "2D",
+                    "component_type": "uint"
+                }
+            },
+            {
+                "comment": "this is the depth texture sampler",
+                "slot": 0,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "sampler",
+                "sampler_config": {
+                    "comparison": false
+                },
+                "dynamic": false
+            }
+        ]
+    ]
+}

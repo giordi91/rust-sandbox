@@ -121,6 +121,12 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
+        let ao_bg= engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_binding_group("resources/ao.bg", gpu_interfaces)
+            .await;
+
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
             &gpu_interfaces,
@@ -141,6 +147,7 @@ impl platform::Application for Sandbox {
             bytemuck::cast_slice(&matrices[..]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
+        let matrices_size = matrices.len() * std::mem::size_of::<ObjectBuffer>();
         let matrix_size = std::mem::size_of::<ObjectBuffer>();
 
         //the second layout is the one on a per object basis, so we create one per
