@@ -1,4 +1,3 @@
-
 use winit::{event::*, window::Window};
 
 use rust_sandbox::engine::graphics;
@@ -18,7 +17,7 @@ pub struct HelloTriangle {
     camera_controller: graphics::camera::CameraControllerFPS,
     per_frame_data: graphics::FrameData,
     time_stamp: u64,
-    delta_time: u64
+    delta_time: u64,
 }
 
 #[async_trait(?Send)]
@@ -56,7 +55,10 @@ impl platform::Application for HelloTriangle {
         let layout_handle = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group("resources/examples/hello-triangle/hello-triangle.bg", gpu_interfaces)
+            .load_binding_group(
+                "resources/examples/hello-triangle/hello-triangle.bg",
+                gpu_interfaces,
+            )
             .await;
 
         let render_pipeline_handle = engine_runtime
@@ -66,14 +68,15 @@ impl platform::Application for HelloTriangle {
                 "resources/examples/hello-triangle/hello-triangle.pipeline",
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
-                wgpu::TextureFormat::Depth32Float
+                wgpu::TextureFormat::Depth32Float,
             )
             .await;
 
+        //we only have one layout in this simple shader so we access the first one only
         let bg_layout = engine_runtime
             .resource_managers
             .pipeline_manager
-            .get_bind_group_from_handle(layout_handle);
+            .get_bind_group_from_handle(layout_handle.get(0).unwrap());
 
         let uniform_bind_group =
             gpu_interfaces
@@ -91,7 +94,6 @@ impl platform::Application for HelloTriangle {
                     label: Some("uniform_bind_group"),
                 });
 
-
         Self {
             engine_runtime,
             render_pipeline_handle,
@@ -102,7 +104,7 @@ impl platform::Application for HelloTriangle {
             color,
             camera_controller,
             per_frame_data,
-            time_stamp:platform::core::get_time_in_micro(),
+            time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
         }
     }
@@ -117,14 +119,15 @@ impl platform::Application for HelloTriangle {
         self.camera_controller.process_events(event)
     }
 
-    fn update(&mut self, command_buffers : &mut Vec<wgpu::CommandBuffer> ) {
+    fn update(&mut self, command_buffers: &mut Vec<wgpu::CommandBuffer>) {
         //let us update time
         let curr_time = platform::core::get_time_in_micro();
         self.delta_time = curr_time - self.time_stamp;
         self.time_stamp = curr_time;
 
         //not doing anything here yet
-        self.camera_controller.update_camera(&mut self.camera, self.delta_time);
+        self.camera_controller
+            .update_camera(&mut self.camera, self.delta_time);
         self.per_frame_data.update_view_proj(&self.camera);
 
         // Copy operation's are performed on the gpu, so we'll need
@@ -157,7 +160,7 @@ impl platform::Application for HelloTriangle {
         command_buffers.push(encoder.finish());
     }
 
-    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer> ) {
+    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer>) {
         //first we need to get the frame we can use from the swap chain so we can render to it
         let frame = self
             .engine_runtime
@@ -217,7 +220,6 @@ impl platform::Application for HelloTriangle {
     }
 }
 
-fn main()
-{
+fn main() {
     platform::run_application::<HelloTriangle>("HelloTriangle v1.1.0");
 }

@@ -21,6 +21,8 @@ use async_trait::async_trait;
 
 use super::graphics::api;
 
+use log;
+
 
 #[derive(Debug)]
 pub enum Platform
@@ -123,7 +125,7 @@ pub fn run_application<T: Application>(window_title: &str)
 
     #[cfg(not(target_arch = "wasm32"))]
         {
-            //env_logger::init();
+            env_logger::init();
             // Temporarily avoid srgb formats for the swapchain on the web
             // Since main can't be async, we're going to need to block
             futures::executor::block_on(run::<T>(

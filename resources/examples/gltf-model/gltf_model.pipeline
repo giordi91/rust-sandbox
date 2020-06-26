@@ -2,10 +2,10 @@
     "type": "raster",
     "layout": "resources/examples/gltf-model/gltf_model.bg",
     "vertex": {
-        "shader_name": "resources/shader"
+        "shader_name": "resources/examples/gltf-model/shader"
     },
     "fragment": {
-        "shader_name": "resources/shader"
+        "shader_name": "resources/examples/gltf-model/shader"
     },
     "rasterization_state": {
         "type": "default"

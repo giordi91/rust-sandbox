@@ -49,7 +49,7 @@ impl ShaderManager {
             platform::Platform::BROWSER => true,
             //TODO here I want an engine setting I can pass to see if I want to force shader
             //compilation from spv. for now we force it here on native
-            platform::Platform::NATIVE =>  false &&  file_system::file_exists(&spv).await,
+            platform::Platform::NATIVE =>   file_system::file_exists(&spv).await,
         };
 
         let file_name = if spv_exists { spv } else { shader_file };
