@@ -109,7 +109,6 @@ impl platform::Application for Sandbox {
                 });
 
         let gltf_file = graphics::model::load_gltf_file(
-            //"resources/examples/gltf-model/Suzanne.gltf",
             "resources/aoScene/aoScene.gltf",
             &gpu_interfaces,
             &mut engine_runtime.resource_managers.buffer_manager,
