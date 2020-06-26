@@ -23,7 +23,6 @@ pub fn create_depth_texture(device: &wgpu::Device, sc_desc: &wgpu::SwapChainDesc
         format: wgpu::TextureFormat::Depth32Float,
         usage: wgpu::TextureUsage::OUTPUT_ATTACHMENT 
             | wgpu::TextureUsage::SAMPLED 
-            | wgpu::TextureUsage::COPY_SRC,
     };
     let texture = device.create_texture(&desc);
 

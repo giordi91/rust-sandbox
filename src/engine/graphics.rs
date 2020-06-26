@@ -12,6 +12,7 @@ pub mod buffer;
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
 pub struct FrameData {
     view_proj: cgmath::Matrix4<f32>,
+    view_proj_inverse: cgmath::Matrix4<f32>,
 }
 
 impl FrameData {
@@ -19,11 +20,13 @@ impl FrameData {
         use cgmath::SquareMatrix;
         Self {
             view_proj: cgmath::Matrix4::identity(),
+            view_proj_inverse: cgmath::Matrix4::identity(),
         }
     }
 
     pub fn update_view_proj(&mut self, camera: &camera::Camera) {
         self.view_proj = camera.build_view_projection_matrix();
+        self.view_proj_inverse = camera.build_proj_inverse();
     }
 }
 

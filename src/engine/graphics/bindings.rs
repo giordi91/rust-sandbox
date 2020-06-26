@@ -347,6 +347,15 @@ fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescrip
                 }],
             },
         ],
+        "position" => vec![wgpu::VertexBufferDescriptor {
+            stride: 12 as wgpu::BufferAddress,
+            step_mode: wgpu::InputStepMode::Vertex,
+            attributes: &[wgpu::VertexAttributeDescriptor {
+                offset: 0,
+                shader_location: 0,
+                format: wgpu::VertexFormat::Float3,
+            }],
+        }],
         "none" => Vec::new(),
         _ => panic!("could not find {} vertex description", name),
     }
@@ -382,22 +391,28 @@ pub fn get_pipeline_color_states(
     pipe_content_json: &Value,
     swap_chain_format: wgpu::TextureFormat,
 ) -> Vec<wgpu::ColorStateDescriptor> {
-    let color_values = pipe_content_json["color_states"].as_array().unwrap();
-    let mut color_states = Vec::new();
-    for color_value in color_values {
-        let format = get_pipeline_color_format(color_value, swap_chain_format);
-        let color_blend = get_pipeline_blend(color_value, "color_blend");
-        let alpha_blend = get_pipeline_blend(color_value, "alpha_blend");
+    let color_values = &pipe_content_json["color_states"];
 
-        color_states.push(wgpu::ColorStateDescriptor {
-            format,
-            color_blend,
-            alpha_blend,
-            write_mask: wgpu::ColorWrite::ALL,
-        });
+    let color_exists = !color_values.is_null();
+    if color_exists {
+        let mut color_states = Vec::new();
+        for color_value in color_values.as_array().unwrap() {
+            let format = get_pipeline_color_format(color_value, swap_chain_format);
+            let color_blend = get_pipeline_blend(color_value, "color_blend");
+            let alpha_blend = get_pipeline_blend(color_value, "alpha_blend");
+
+            color_states.push(wgpu::ColorStateDescriptor {
+                format,
+                color_blend,
+                alpha_blend,
+                write_mask: wgpu::ColorWrite::ALL,
+            });
+        }
+
+        return color_states;
+    } else {
+        Vec::new()
     }
-
-    color_states
 }
 
 fn get_pipeline_blend(color_value: &Value, name: &str) -> wgpu::BlendDescriptor {

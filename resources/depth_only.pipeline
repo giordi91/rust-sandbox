@@ -1,0 +1,23 @@
+{
+    "type": "raster",
+    "layout": "resources/gltf_model.bg",
+    "vertex": {
+        "shader_name": "resources/depth_only"
+    },
+    "rasterization_state": {
+        "type": "default"
+    },
+    "primitive_topology": "triangleList",
+    "vertex_state": {
+        "type": "position"
+    },
+    "depth_state": {
+        "format": "default",
+        "depth_write_enabled": true,
+        "depth_compare": "Greater",
+        "stencil_front": "Ignore",
+        "stencil_back": "Ignore",
+        "stencil_read_mask": 0,
+        "stencil_write_mask": 0
+    }
+}

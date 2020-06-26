@@ -1,5 +1,7 @@
 use winit::event::*;
 
+use cgmath::SquareMatrix;
+
 #[rustfmt::skip] //just to avoid the matrix being formatted
 pub const OPENGL_TO_WGPU_MATRIX: cgmath::Matrix4<f32> = cgmath::Matrix4::new(
     1.0, 0.0, 0.0, 0.0,
@@ -23,6 +25,11 @@ impl Camera {
         let view = cgmath::Matrix4::look_at(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
         OPENGL_TO_WGPU_MATRIX * proj * view
+    }
+    pub fn build_proj_inverse(&self) ->cgmath::Matrix4<f32>{
+        let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
+        let fixed_proj = OPENGL_TO_WGPU_MATRIX * proj;
+        fixed_proj.invert().unwrap()
     }
 }
 

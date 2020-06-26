@@ -20,6 +20,7 @@ unsafe impl bytemuck::Zeroable for ObjectBuffer {}
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
     render_pipeline_handle: handle::ResourceHandle,
+    depth_only_pipeline: handle::ResourceHandle,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
@@ -86,6 +87,17 @@ impl platform::Application for Sandbox {
             )
             .await;
 
+        let depth_only_pipeline = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_pipeline(
+                "resources/depth_only.pipeline",
+                &mut engine_runtime.resource_managers.shader_manager,
+                &engine_runtime.gpu_interfaces,
+                default_depth_format,
+            )
+            .await;
+
         platform::core::to_console("NEW3!");
 
         let bg_layout = engine_runtime
@@ -120,16 +132,15 @@ impl platform::Application for Sandbox {
         for model in &gltf_file.models {
             matrices.push(ObjectBuffer {
                 transform: model.matrix,
-                pad1 : cgmath::SquareMatrix::identity(),
-                pad2 : cgmath::SquareMatrix::identity(),
-                pad3 : cgmath::SquareMatrix::identity(),
+                pad1: cgmath::SquareMatrix::identity(),
+                pad2: cgmath::SquareMatrix::identity(),
+                pad3: cgmath::SquareMatrix::identity(),
             });
         }
         let matrices_buffer = gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(&matrices[..]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
-        let matrices_size = matrices.len() * std::mem::size_of::<ObjectBuffer>();
         let matrix_size = std::mem::size_of::<ObjectBuffer>();
 
         //the second layout is the one on a per object basis, so we create one per
@@ -141,8 +152,8 @@ impl platform::Application for Sandbox {
 
         let mut per_object_bind_groups = Vec::new();
         for i in 0..gltf_file.models.len() {
-            let start = (i*matrix_size) as u64;
-            let end = (i+1)*matrix_size;
+            let start = (i * matrix_size) as u64;
+            let end = (i + 1) * matrix_size;
             let uniform_bind_group_2 =
                 gpu_interfaces
                     .device
@@ -170,6 +181,7 @@ impl platform::Application for Sandbox {
         Self {
             engine_runtime,
             render_pipeline_handle,
+            depth_only_pipeline,
             camera,
             uniform_buffer,
             uniform_bind_group,
@@ -251,46 +263,52 @@ impl platform::Application for Sandbox {
             .get_next_texture()
             .expect("Timeout getting texture");
 
+        let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+            attachment: &self.depth_texture.view,
+            depth_load_op: wgpu::LoadOp::Clear,
+            depth_store_op: wgpu::StoreOp::Store,
+            clear_depth: 0.0,
+            stencil_load_op: wgpu::LoadOp::Clear,
+            stencil_store_op: wgpu::StoreOp::Store,
+            clear_stencil: 0,
+        });
+        //do the depth prepass
         {
-            let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: &self.depth_texture.view,
-                depth_load_op: wgpu::LoadOp::Clear,
-                depth_store_op: wgpu::StoreOp::Store,
-                clear_depth: 0.0,
-                stencil_load_op: wgpu::LoadOp::Clear,
-                stencil_store_op: wgpu::StoreOp::Store,
-                clear_stencil: 0,
-            });
-
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
-                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
-                    resolve_target: None,
-                    load_op: wgpu::LoadOp::Clear,
-                    store_op: wgpu::StoreOp::Store,
-                    clear_color: wgpu::Color {
-                        r: 0.1,
-                        g: 0.2,
-                        b: self.color,
-                        a: 1.0,
-                    },
-                }],
+                color_attachments: &[],
+                //color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                //    attachment: &frame.view,
+                //    resolve_target: None,
+                //    load_op: wgpu::LoadOp::Clear,
+                //    store_op: wgpu::StoreOp::Store,
+                //    clear_color: wgpu::Color {
+                //        r: 0.1,
+                //        g: 0.2,
+                //        b: self.color,
+                //        a: 1.0,
+                //    },
+                //}],
                 depth_stencil_attachment,
             });
 
+            //let render_pipeline = self
+            //    .engine_runtime
+            //    .resource_managers
+            //    .pipeline_manager
+            //    .get_pipeline_from_handle(&self.render_pipeline_handle);
             let render_pipeline = self
                 .engine_runtime
                 .resource_managers
                 .pipeline_manager
-                .get_pipeline_from_handle(&self.render_pipeline_handle);
+                .get_pipeline_from_handle(&self.depth_only_pipeline);
             render_pass.set_pipeline(&render_pipeline.unwrap());
+            //set the per frame binding group
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             let models = &self.gltf_file.models;
-            let mut counter= 0;
+            let mut counter = 0;
             for model in models {
-
-                let obj_bind =self.per_object_bind_groups.get(counter).unwrap();
+                let obj_bind = self.per_object_bind_groups.get(counter).unwrap();
                 render_pass.set_bind_group(1, &obj_bind, &[]);
                 for mesh in model.meshes.iter() {
                     let pos_mapper = mesh
@@ -302,14 +320,14 @@ impl platform::Application for Sandbox {
                         .buffer_manager
                         .get_buffer_from_handle(&pos_idx);
 
-                    let n_mapper =
-                        mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
-                    let n_idx = n_mapper.buffer_idx;
-                    let n_buff = self
-                        .engine_runtime
-                        .resource_managers
-                        .buffer_manager
-                        .get_buffer_from_handle(&n_idx);
+                    //let n_mapper =
+                    //    mesh.get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Normals);
+                    //let n_idx = n_mapper.buffer_idx;
+                    //let n_buff = self
+                    //    .engine_runtime
+                    //    .resource_managers
+                    //    .buffer_manager
+                    //    .get_buffer_from_handle(&n_idx);
 
                     let mut idx_count = 0;
                     match &mesh.index_buffer {
@@ -327,11 +345,12 @@ impl platform::Application for Sandbox {
                         None => {}
                     }
 
+                    //only need the positions
                     render_pass.set_vertex_buffer(0, pos_buff, pos_mapper.offset as u64, 0);
-                    render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
+                    //render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
                     render_pass.draw_indexed(0..idx_count, 0, 0..1);
                 }
-                counter+=1;
+                counter += 1;
             }
         }
 
