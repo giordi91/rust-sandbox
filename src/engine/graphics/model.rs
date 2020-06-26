@@ -292,7 +292,6 @@ pub async fn load_gltf_file(
     let mut models = Vec::new();
 
     for scene in gltf.scenes() {
-        //scene
         for node in scene.nodes() {
             if let Some(curr_mesh) = node.mesh() {
                 //we have the correct node let us extract the mesh
@@ -321,26 +320,3 @@ pub async fn load_gltf_file(
     GltfFile { models }
 }
 
-/*
-fn load_transformation(
-    mesh: &gltf::Mesh,
-    mesh_index: u32,
-    gltf_scene: &gltf::Scene,
-) -> cgmath::Matrix4<f32> {
-
-    let mesh_idx = mesh.index();
-    for node in gltf_scene.nodes(){
-
-        if let  Some(curr_mesh)= node.mesh()
-        {
-            if curr_mesh.index() != mesh_idx
-            {
-                continue;
-            }
-            //we have the correct node let us extract the mesh
-            node.transform()
-        }
-    }
-    cgmath::prelude::SquareMatrix::identity()
-}
-*/

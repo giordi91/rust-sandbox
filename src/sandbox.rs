@@ -5,6 +5,15 @@ use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
 
+//This is a simple datastruct to represent per-object data in the shader
+#[repr(C)] // We need this for Rust to store our data correctly for the shaders
+#[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
+pub struct ObjectBuffer {
+    transform: cgmath::Matrix4<f32>,
+}
+unsafe impl bytemuck::Pod for ObjectBuffer {}
+unsafe impl bytemuck::Zeroable for ObjectBuffer {}
+
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
     render_pipeline_handle: handle::ResourceHandle,
@@ -19,6 +28,7 @@ pub struct Sandbox {
     delta_time: u64,
     gltf_file: graphics::model::GltfFile,
     depth_texture: graphics::texture::Texture,
+    matrices_buffer: wgpu::Buffer,
 }
 
 #[async_trait(?Send)]
@@ -106,6 +116,16 @@ impl platform::Application for Sandbox {
         )
         .await;
 
+        //we are gonig to build a single buffer with all the necessary matrices
+        let mut matrices = Vec::new();
+        for model in &gltf_file.models {
+            matrices.push(ObjectBuffer{transform: model.matrix});
+        }
+        let matrices_buffer = gpu_interfaces.device.create_buffer_with_data(
+            bytemuck::cast_slice(&matrices[..]),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
+
         let depth_texture = graphics::texture::Texture::create_depth_texture(
             &engine_runtime.gpu_interfaces.device,
             &engine_runtime.gpu_interfaces.sc_desc,
@@ -126,6 +146,7 @@ impl platform::Application for Sandbox {
             delta_time: 0,
             gltf_file,
             depth_texture,
+            matrices_buffer,
         }
     }
 
