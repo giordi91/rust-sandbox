@@ -8,7 +8,7 @@ use crate::engine::platform::file_system;
 #[derive(Default)]
 pub struct PipelineManager {
     bg_mapper: HashMap<u64, wgpu::BindGroupLayout>,
-    bg_path_mapper: HashMap<String, u64>,
+    bg_path_mapper: HashMap<String, Vec<u64>>,
     pipe_mapper: HashMap<u64, wgpu::RenderPipeline>,
     pipe_path_mapper: HashMap<String, u64>,
     handle_counter: u64,
@@ -74,7 +74,7 @@ impl PipelineManager {
 
     pub fn get_bind_group_from_handle(
         &self,
-        handle: handle::ResourceHandle,
+        handle: &handle::ResourceHandle,
     ) -> Result<&wgpu::BindGroupLayout, &'static str> {
         let value = handle.get_value();
         let group = match self.bg_mapper.get(&value) {
@@ -88,55 +88,76 @@ impl PipelineManager {
         &mut self,
         file_name: &str,
         gpu_interfaces: &graphics::api::GPUInterfaces,
-    ) -> handle::ResourceHandle {
+    ) -> Vec<handle::ResourceHandle> {
         let loaded = self.bg_path_mapper.contains_key(file_name);
         if loaded {
-            return handle::ResourceHandle::from_data(self.bg_path_mapper[file_name]);
+            let source_data = self.bg_path_mapper.get(file_name);
+            let mut to_return = Vec::new();
+            for h in source_data.unwrap() {
+                to_return.push(handle::ResourceHandle::from_data(*h));
+            }
+            return to_return;
         }
 
         let bg_source = file_system::load_file_string(file_name).await.unwrap();
         let bg_content_js: Value = serde_json::from_str(&bg_source[..]).unwrap();
-        let bindings_values = &bg_content_js["bindings"].as_array().unwrap();
+        let set_values = bg_content_js["bindings"].as_array().unwrap();
 
-        let mut bindings = Vec::new();
-        for binding in *bindings_values {
-            let slot = binding["slot"].as_u64().unwrap() as u32;
-            let visibility_array = binding["visibility"].as_array().unwrap();
-            let visibility_bitfiled = get_bind_group_visibility(visibility_array);
-            let type_value = binding["type"].as_str().unwrap();
-            let binding_type = get_bind_group_type(type_value, binding);
+        let mut set_bindings = Vec::new();
+        for set in set_values {
+            let mut bindings = Vec::new();
+            let json_bindings = set.as_array().unwrap();
+            for binding in json_bindings {
+                let slot = binding["slot"].as_u64().unwrap() as u32;
+                let visibility_array = binding["visibility"].as_array().unwrap();
+                let visibility_bitfiled = get_bind_group_visibility(visibility_array);
+                let type_value = binding["type"].as_str().unwrap();
+                let binding_type = get_bind_group_type(type_value, binding);
 
-            bindings.push(wgpu::BindGroupLayoutEntry {
-                binding: slot,
-                visibility: visibility_bitfiled,
-                ty: binding_type,
-            })
+                bindings.push(wgpu::BindGroupLayoutEntry {
+                    binding: slot,
+                    visibility: visibility_bitfiled,
+                    ty: binding_type,
+                });
+            }
+            //oh wow... all this to get the string
+            let file_name_no_ext = std::path::Path::new(file_name)
+                .file_stem()
+                .unwrap()
+                .to_str()
+                .unwrap();
+            let bind_group_layout =
+                gpu_interfaces
+                    .device
+                    .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+                        bindings: &bindings[..],
+                        label: Some(&format!("{}_bg", file_name_no_ext)[..]),
+                    });
+
+            self.handle_counter += 1;
+            self.bg_mapper
+                .insert(self.handle_counter, bind_group_layout);
+
+            let file_name_str = String::from(file_name);
+            if self.bg_path_mapper.contains_key(&file_name_str) {
+                self.bg_path_mapper
+                    .get_mut(&file_name_str)
+                    .unwrap()
+                    .push(self.handle_counter)
+            } else {
+                let v = vec![self.handle_counter];
+                self.bg_path_mapper.insert(file_name_str, v);
+            }
+
+            let h = handle::ResourceHandle::new(
+                handle::ResourceHandleType::BindingGroup,
+                self.handle_counter,
+            );
+
+            set_bindings.push(h);
         }
 
-        //oh wow... all this to get the string
-        let file_name_no_ext = std::path::Path::new(file_name)
-            .file_stem()
-            .unwrap()
-            .to_str()
-            .unwrap();
-        let bind_group_layout =
-            gpu_interfaces
-                .device
-                .create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
-                    bindings: &bindings[..],
-                    label: Some(&format!("{}_bg", file_name_no_ext)[..]),
-                });
-
-        self.handle_counter += 1;
-        self.bg_mapper
-            .insert(self.handle_counter, bind_group_layout);
-        self.bg_path_mapper
-            .insert(String::from(file_name), self.handle_counter);
-
-        handle::ResourceHandle::new(
-            handle::ResourceHandleType::BindingGroup,
-            self.handle_counter,
-        )
+        set_bindings
     }
 
     async fn process_raster_pipeline(
@@ -215,22 +236,23 @@ impl PipelineManager {
             get_pipeline_color_states(&pipe_content_json, gpu_interfaces.sc_desc.format);
 
         let layout_name = pipe_content_json["layout"].as_str().unwrap();
-        let bg_layout_handle = self
-            .load_binding_group(layout_name, gpu_interfaces)
-            .await;
+        let bg_layout_handles = self.load_binding_group(layout_name, gpu_interfaces).await;
 
-        let bg_layout = self.get_bind_group_from_handle(bg_layout_handle);
+        let mut layouts_to_bind = Vec::new();
+        for h in bg_layout_handles {
+            let bg_layout = self.get_bind_group_from_handle(&h);
+            layouts_to_bind.push(bg_layout.unwrap());
+        }
 
         let render_pipeline_layout =
             gpu_interfaces
                 .device
                 .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
-                    bind_group_layouts: &[&bg_layout.unwrap()],
+                    bind_group_layouts: &layouts_to_bind[..],
                 });
 
         let vertex_state_type = pipe_content_json["vertex_state"]["type"].as_str().unwrap();
         let desc = get_vertex_attrbibute_descriptor(vertex_state_type);
-        println!("{} {}", vertex_state_type,desc.len());
 
         gpu_interfaces
             .device
@@ -276,22 +298,20 @@ fn get_depth_stencil_state(
     let depth_write_enabled = state_value["depth_write_enabled"].as_bool().unwrap();
     let depth_compare = get_compare_function(&state_value["depth_compare"]);
 
-    Some(wgpu::DepthStencilStateDescriptor{
+    Some(wgpu::DepthStencilStateDescriptor {
         format,
         depth_write_enabled,
         depth_compare,
-        stencil_front : wgpu::StencilStateFaceDescriptor::IGNORE, 
-        stencil_back : wgpu::StencilStateFaceDescriptor::IGNORE, 
+        stencil_front: wgpu::StencilStateFaceDescriptor::IGNORE,
+        stencil_back: wgpu::StencilStateFaceDescriptor::IGNORE,
         stencil_read_mask: 0,
-        stencil_write_mask :0,
+        stencil_write_mask: 0,
     })
 }
 
-fn get_compare_function(value: &serde_json::Value)-> wgpu::CompareFunction
-{
+fn get_compare_function(value: &serde_json::Value) -> wgpu::CompareFunction {
     let compare_str = value.as_str().unwrap();
-    match  compare_str
-    {
+    match compare_str {
         "Undefined" => wgpu::CompareFunction::Undefined,
         "Never" => wgpu::CompareFunction::Never,
         "Less" => wgpu::CompareFunction::Less,
@@ -301,7 +321,7 @@ fn get_compare_function(value: &serde_json::Value)-> wgpu::CompareFunction
         "NotEqual" => wgpu::CompareFunction::NotEqual,
         "GreaterEqual" => wgpu::CompareFunction::GreaterEqual,
         "Always" => wgpu::CompareFunction::Always,
-        _ => panic!("Not supported compare fuction {}",  compare_str)
+        _ => panic!("Not supported compare fuction {}", compare_str),
     }
 }
 
@@ -327,7 +347,7 @@ fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescrip
                 }],
             },
         ],
-        "none" =>  Vec::new(),
+        "none" => Vec::new(),
         _ => panic!("could not find {} vertex description", name),
     }
 }

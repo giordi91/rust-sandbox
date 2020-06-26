@@ -10,6 +10,9 @@ use rust_sandbox::engine::platform;
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
 pub struct ObjectBuffer {
     transform: cgmath::Matrix4<f32>,
+    pad1: cgmath::Matrix4<f32>,
+    pad2: cgmath::Matrix4<f32>,
+    pad3: cgmath::Matrix4<f32>,
 }
 unsafe impl bytemuck::Pod for ObjectBuffer {}
 unsafe impl bytemuck::Zeroable for ObjectBuffer {}
@@ -20,6 +23,7 @@ pub struct Sandbox {
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
+    per_object_bind_groups: Vec<wgpu::BindGroup>,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
     camera_controller: graphics::camera::CameraControllerFPS,
@@ -63,13 +67,10 @@ impl platform::Application for Sandbox {
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
 
-        let layout_handle = engine_runtime
+        let layout_handles = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group(
-                "resources/examples/gltf-model/gltf_model.bg",
-                gpu_interfaces,
-            )
+            .load_binding_group("resources/gltf_model.bg", gpu_interfaces)
             .await;
 
         let default_depth_format = wgpu::TextureFormat::Depth32Float;
@@ -78,7 +79,7 @@ impl platform::Application for Sandbox {
             .resource_managers
             .pipeline_manager
             .load_pipeline(
-                "resources/examples/gltf-model/gltf_model.pipeline",
+                "resources/gltf_model.pipeline",
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
                 default_depth_format,
@@ -90,7 +91,7 @@ impl platform::Application for Sandbox {
         let bg_layout = engine_runtime
             .resource_managers
             .pipeline_manager
-            .get_bind_group_from_handle(layout_handle);
+            .get_bind_group_from_handle(layout_handles.get(0).unwrap());
 
         let uniform_bind_group =
             gpu_interfaces
@@ -114,16 +115,51 @@ impl platform::Application for Sandbox {
             &mut engine_runtime.resource_managers.buffer_manager,
         )
         .await;
-
         //we are gonig to build a single buffer with all the necessary matrices
         let mut matrices = Vec::new();
         for model in &gltf_file.models {
-            matrices.push(ObjectBuffer{transform: model.matrix});
+            matrices.push(ObjectBuffer {
+                transform: model.matrix,
+                pad1 : cgmath::SquareMatrix::identity(),
+                pad2 : cgmath::SquareMatrix::identity(),
+                pad3 : cgmath::SquareMatrix::identity(),
+            });
         }
         let matrices_buffer = gpu_interfaces.device.create_buffer_with_data(
             bytemuck::cast_slice(&matrices[..]),
             wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
         );
+        let matrices_size = matrices.len() * std::mem::size_of::<ObjectBuffer>();
+        let matrix_size = std::mem::size_of::<ObjectBuffer>();
+
+        //the second layout is the one on a per object basis, so we create one per
+        //object
+        let bg_layout_2 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(layout_handles.get(1).unwrap());
+
+        let mut per_object_bind_groups = Vec::new();
+        for i in 0..gltf_file.models.len() {
+            let start = (i*matrix_size) as u64;
+            let end = (i+1)*matrix_size;
+            let uniform_bind_group_2 =
+                gpu_interfaces
+                    .device
+                    .create_bind_group(&wgpu::BindGroupDescriptor {
+                        layout: &bg_layout_2.unwrap(),
+                        bindings: &[wgpu::Binding {
+                            binding: 0,
+                            resource: wgpu::BindingResource::Buffer {
+                                buffer: &matrices_buffer,
+                                // FYI: you can share a single buffer between bindings.
+                                range: start..end as wgpu::BufferAddress,
+                            },
+                        }],
+                        label: Some("uniform_bind_group 2"),
+                    });
+            per_object_bind_groups.push(uniform_bind_group_2);
+        }
 
         let depth_texture = graphics::texture::Texture::create_depth_texture(
             &engine_runtime.gpu_interfaces.device,
@@ -137,6 +173,7 @@ impl platform::Application for Sandbox {
             camera,
             uniform_buffer,
             uniform_bind_group,
+            per_object_bind_groups,
             size,
             color,
             camera_controller,
@@ -250,7 +287,11 @@ impl platform::Application for Sandbox {
             render_pass.set_bind_group(0, &self.uniform_bind_group, &[]);
 
             let models = &self.gltf_file.models;
+            let mut counter= 0;
             for model in models {
+
+                let obj_bind =self.per_object_bind_groups.get(counter).unwrap();
+                render_pass.set_bind_group(1, &obj_bind, &[]);
                 for mesh in model.meshes.iter() {
                     let pos_mapper = mesh
                         .get_buffer_from_semantic(graphics::model::MeshBufferSemantic::Positions);
@@ -290,6 +331,7 @@ impl platform::Application for Sandbox {
                     render_pass.set_vertex_buffer(1, n_buff, n_mapper.offset as u64, 0);
                     render_pass.draw_indexed(0..idx_count, 0, 0..1);
                 }
+                counter+=1;
             }
         }
 
