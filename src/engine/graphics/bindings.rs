@@ -380,9 +380,34 @@ pub fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
 pub fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
     match type_str {
         //if is a uniform , we extract some extra data and return the built type
-        "uniform" => wgpu::BindingType::UniformBuffer {
-            dynamic: binding["dynamic"].as_bool().unwrap(),
-        },
+        "uniform" => {
+            let uniform_config = &binding["uniform_config"];
+            wgpu::BindingType::UniformBuffer {
+                dynamic: uniform_config["dynamic"].as_bool().unwrap(),
+            }
+        }
+        "texture" => {
+            let texture_config = &binding["texture_config"];
+            wgpu::BindingType::SampledTexture {
+                multisampled: texture_config["multisampled"].as_bool().unwrap(),
+                dimension: match texture_config["dimension"].as_str().unwrap() {
+                    "2D" => wgpu::TextureViewDimension::D2,
+                    _ => panic!("Texture dimension not yet supported please add it to the code"),
+                },
+                component_type: match texture_config["component_type"].as_str().unwrap() {
+                    "uint" => wgpu::TextureComponentType::Uint,
+                    _ => {
+                        panic!("Texture componet type not yet supported please add it to the code")
+                    }
+                },
+            }
+        }
+        "sampler" => {
+            let sampler_config = &binding["sampler_config"];
+            wgpu::BindingType::Sampler {
+                comparison: sampler_config["comparison"].as_bool().unwrap(),
+            }
+        }
         _ => panic!("Unexpected binding group type {}", type_str),
     }
 }

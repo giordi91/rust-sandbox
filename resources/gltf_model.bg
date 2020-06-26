@@ -1,23 +1,31 @@
 {
     "type": "raster",
     "bindings": [
-        [{
-            "comment": "this is the per frame data, like the camera",
-            "slot": 0,
-            "visibility": [
-                "vertex"
-            ],
-            "type": "uniform",
-            "dynamic": false
-        }],
-        [{
-            "comment": "this is the per object data, like the transform",
-            "slot": 0,
-            "visibility": [
-                "vertex"
-            ],
-            "type": "uniform",
-            "dynamic": false
-        }]
+        [
+            {
+                "comment": "this is the per frame data, like the camera",
+                "slot": 0,
+                "visibility": [
+                    "vertex"
+                ],
+                "type": "uniform",
+                "uniform_config": {
+                    "dynamic": false
+                }
+            }
+        ],
+        [
+            {
+                "comment": "this is the per object data, like the transform",
+                "slot": 0,
+                "visibility": [
+                    "vertex"
+                ],
+                "type": "uniform",
+                "uniform_config": {
+                    "dynamic": false
+                }
+            }
+        ]
     ]
 }

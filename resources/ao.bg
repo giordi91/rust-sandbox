@@ -9,7 +9,9 @@
                     "vertex"
                 ],
                 "type": "uniform",
-                "dynamic": false
+                "uniform_config": {
+                    "dynamic": false
+                }
             }
         ],
         [
@@ -20,7 +22,6 @@
                     "fragment"
                 ],
                 "type": "texture",
-                "dynamic": false,
                 "texture_config": {
                     "multisampled": false,
                     "dimension": "2D",
@@ -36,8 +37,7 @@
                 "type": "sampler",
                 "sampler_config": {
                     "comparison": false
-                },
-                "dynamic": false
+                }
             }
         ]
     ]
