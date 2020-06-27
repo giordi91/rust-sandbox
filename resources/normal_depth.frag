@@ -30,6 +30,4 @@ void main() {
     vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 
     vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));
     f_color = vec4(normal*0.5 + 0.5, 1.0);
-    //f_color = vec4(vec3(depth*10.0f,0,0), 1.0);
-
 }

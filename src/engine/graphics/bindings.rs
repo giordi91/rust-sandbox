@@ -455,6 +455,7 @@ fn get_pipeline_color_format(
     let format_str = color_value["format"].as_str().unwrap();
     match format_str {
         "swap_chain_native" => swap_chain_format,
+        "Rgb10a2Unorm" => wgpu::TextureFormat::Rgb10a2Unorm,
         _ => panic!(
             "unsupported swap chain format {:?}, if is a valid type add it to the function",
             swap_chain_format

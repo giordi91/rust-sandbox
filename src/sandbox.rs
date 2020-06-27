@@ -35,6 +35,7 @@ pub struct Sandbox {
     delta_time: u64,
     gltf_file: graphics::model::GltfFile,
     depth_texture: graphics::texture::Texture,
+    render_target: graphics::texture::Texture,
     matrices_buffer: wgpu::Buffer,
 }
 
@@ -151,6 +152,22 @@ impl platform::Application for Sandbox {
             &engine_runtime.gpu_interfaces.sc_desc,
             "swap-depth",
         );
+        let texture_request = graphics::texture::TextureRequest {
+            width: engine_runtime.gpu_interfaces.sc_desc.width,
+            height: engine_runtime.gpu_interfaces.sc_desc.height,
+            depth: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            format: wgpu::TextureFormat::Rgb10a2Unorm,
+            //NOTE output attachment is temporary
+            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::STORAGE |wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+
+        let render_target = graphics::texture::Texture::create_texture_2D(
+            &engine_runtime.gpu_interfaces.device,
+            texture_request,
+            "render-target",
+        );
 
         let normal_layout0 = engine_runtime
             .resource_managers
@@ -169,7 +186,6 @@ impl platform::Application for Sandbox {
                     binding: 0,
                     resource: wgpu::BindingResource::Buffer {
                         buffer: &uniform_buffer,
-                        // FYI: you can share a single buffer between bindings.
                         range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
                     },
                 }],
@@ -192,7 +208,7 @@ impl platform::Application for Sandbox {
                 ],
                 label: Some("normal binding group 2"),
             });
-        let normal_bgs = vec![normal_bg0,normal_bg1];
+        let normal_bgs = vec![normal_bg0, normal_bg1];
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
@@ -264,6 +280,7 @@ impl platform::Application for Sandbox {
             delta_time: 0,
             gltf_file,
             depth_texture,
+            render_target,
             matrices_buffer,
         }
     }
@@ -428,7 +445,7 @@ impl platform::Application for Sandbox {
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &frame.view,
+                    attachment: &self.render_target.view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
