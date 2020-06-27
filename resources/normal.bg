@@ -12,6 +12,32 @@
                     "dynamic": false
                 }
             }
+        ],
+        [
+            {
+                "comment": "this is the depth texture we want to sample",
+                "slot": 0,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "texture",
+                "texture_config": {
+                    "multisampled": false,
+                    "dimension": "2D",
+                    "component_type": "uint"
+                }
+            },
+            {
+                "comment": "this is the depth texture sampler",
+                "slot": 1,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "sampler",
+                "sampler_config": {
+                    "comparison": false
+                }
+            }
         ]
     ]
 }

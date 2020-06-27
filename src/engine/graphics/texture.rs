@@ -37,7 +37,7 @@ pub fn create_depth_texture(device: &wgpu::Device, sc_desc: &wgpu::SwapChainDesc
         mipmap_filter: wgpu::FilterMode::Nearest,
         lod_min_clamp: -100.0,
         lod_max_clamp: 100.0,
-        compare: wgpu::CompareFunction::LessEqual, 
+        compare: wgpu::CompareFunction::Always, 
     });
 
     Self { texture, view, sampler }

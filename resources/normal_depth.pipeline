@@ -20,14 +20,5 @@
             "color_blend": "replace",
             "alpha_blend": "replace"
         }
-    ],
-    "depth_state": {
-        "format": "default",
-        "depth_write_enabled": false,
-        "depth_compare": "Greater",
-        "stencil_front": "Ignore",
-        "stencil_back": "Ignore",
-        "stencil_read_mask": 0,
-        "stencil_write_mask": 0
-    }
+    ]
 }

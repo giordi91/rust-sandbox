@@ -25,7 +25,7 @@ pub struct Sandbox {
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
-    normal_bg: wgpu::BindGroup,
+    normal_bgs: Vec<wgpu::BindGroup>,
     per_object_bind_groups: Vec<wgpu::BindGroup>,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
@@ -146,27 +146,53 @@ impl platform::Application for Sandbox {
         //    .load_binding_group("resources/ao.bg", gpu_interfaces)
         //    .await;
 
+        let depth_texture = graphics::texture::Texture::create_depth_texture(
+            &engine_runtime.gpu_interfaces.device,
+            &engine_runtime.gpu_interfaces.sc_desc,
+            "swap-depth",
+        );
 
-        let normal_layout = engine_runtime
+        let normal_layout0 = engine_runtime
             .resource_managers
             .pipeline_manager
             .get_bind_group_from_handle(normal_layout_handle.get(0).unwrap());
+        let normal_layout1 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_layout_handle.get(1).unwrap());
 
-        let normal_bg=
-            gpu_interfaces
-                .device
-                .create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &normal_layout.unwrap(),
-                    bindings: &[wgpu::Binding {
+        let normal_bg0 = gpu_interfaces
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &normal_layout0.unwrap(),
+                bindings: &[wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buffer,
+                        // FYI: you can share a single buffer between bindings.
+                        range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                    },
+                }],
+                label: Some("normal binding group"),
+            });
+
+        let normal_bg1 = gpu_interfaces
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &normal_layout1.unwrap(),
+                bindings: &[
+                    wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buffer,
-                            // FYI: you can share a single buffer between bindings.
-                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
-                        },
-                    }],
-                    label: Some("normal binding group"),
-                });
+                        resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                    },
+                    wgpu::Binding {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
+                    },
+                ],
+                label: Some("normal binding group 2"),
+            });
+        let normal_bgs = vec![normal_bg0,normal_bg1];
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
@@ -220,12 +246,6 @@ impl platform::Application for Sandbox {
             per_object_bind_groups.push(uniform_bind_group_2);
         }
 
-        let depth_texture = graphics::texture::Texture::create_depth_texture(
-            &engine_runtime.gpu_interfaces.device,
-            &engine_runtime.gpu_interfaces.sc_desc,
-            "swap-depth",
-        );
-
         Self {
             engine_runtime,
             render_pipeline_handle,
@@ -234,7 +254,7 @@ impl platform::Application for Sandbox {
             camera,
             uniform_buffer,
             uniform_bind_group,
-            normal_bg,
+            normal_bgs,
             per_object_bind_groups,
             size,
             color,
@@ -406,15 +426,6 @@ impl platform::Application for Sandbox {
 
         //normal reconstruction
         {
-            let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-                attachment: &self.depth_texture.view,
-                depth_load_op: wgpu::LoadOp::Clear,
-                depth_store_op: wgpu::StoreOp::Store,
-                clear_depth: 0.0,
-                stencil_load_op: wgpu::LoadOp::Clear,
-                stencil_store_op: wgpu::StoreOp::Store,
-                clear_stencil: 0,
-            });
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
                     attachment: &frame.view,
@@ -428,7 +439,7 @@ impl platform::Application for Sandbox {
                         a: 1.0,
                     },
                 }],
-                depth_stencil_attachment,
+                depth_stencil_attachment: None,
             });
 
             //let render_pipeline = self
@@ -443,7 +454,8 @@ impl platform::Application for Sandbox {
                 .get_pipeline_from_handle(&self.normal_pipeline);
             render_pass.set_pipeline(&render_pipeline.unwrap());
             //set the per frame binding group
-            render_pass.set_bind_group(0, &self.normal_bg, &[]);
+            render_pass.set_bind_group(0, &self.normal_bgs.get(0).unwrap(), &[]);
+            render_pass.set_bind_group(1, &self.normal_bgs.get(1).unwrap(), &[]);
             render_pass.draw(0..6, 0..1);
         }
 
