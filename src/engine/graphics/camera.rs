@@ -27,8 +27,10 @@ impl Camera {
         OPENGL_TO_WGPU_MATRIX * proj * view
     }
     pub fn build_proj_inverse(&self) ->cgmath::Matrix4<f32>{
+
+        let view = cgmath::Matrix4::look_at(self.eye, self.target, self.up);
         let proj = cgmath::perspective(cgmath::Deg(self.fovy), self.aspect, self.znear, self.zfar);
-        let fixed_proj = OPENGL_TO_WGPU_MATRIX * proj;
+        let fixed_proj = OPENGL_TO_WGPU_MATRIX * proj * view;
         fixed_proj.invert().unwrap()
     }
 }

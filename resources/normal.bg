@@ -5,7 +5,7 @@
             {
                 "slot": 0,
                 "visibility": [
-                    "vertex"
+                    "vertex","fragment"
                 ],
                 "type": "uniform",
                 "uniform_config": {
