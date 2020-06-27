@@ -10,6 +10,7 @@ pub struct PipelineManager {
     bg_mapper: HashMap<u64, wgpu::BindGroupLayout>,
     bg_path_mapper: HashMap<String, Vec<u64>>,
     pipe_mapper: HashMap<u64, wgpu::RenderPipeline>,
+    compute_pipe_mapper: HashMap<u64, wgpu::ComputePipeline>,
     pipe_path_mapper: HashMap<String, u64>,
     handle_counter: u64,
 }
@@ -26,39 +27,44 @@ impl PipelineManager {
         let loaded = self.pipe_path_mapper.contains_key(file_name);
         if loaded {
             let handle_data = self.pipe_path_mapper[file_name];
-            //we need to check if the handle matches the index buffer size
-            let index_16bit_tag = (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT);
-            let pipe_correct_index_size = (handle_data & index_16bit_tag) > 0;
-            if pipe_correct_index_size {
-                return handle::ResourceHandle::from_data(handle_data);
-            }
+            return handle::ResourceHandle::from_data(handle_data);
         }
 
         let pipe_source = file_system::load_file_string(file_name).await.unwrap();
         let pipe_content_json: Value = serde_json::from_str(&pipe_source[..]).unwrap();
 
         let pipe_type = pipe_content_json["type"].as_str().unwrap();
-        let pipe = match pipe_type {
-            "raster" => {
-                self.process_raster_pipeline(
-                    pipe_content_json,
-                    shader_manager,
-                    gpu_interfaces,
-                    default_depth_format,
-                )
-                .await
-            }
-            _ => panic!(),
-        };
 
         self.handle_counter += 1;
-        let handle = self.handle_counter;
+        let mut handle = self.handle_counter;
 
-        self.pipe_mapper.insert(handle, pipe);
+        match pipe_type {
+            "raster" => {
+                let pipe = self
+                    .process_raster_pipeline(
+                        pipe_content_json,
+                        shader_manager,
+                        gpu_interfaces,
+                        default_depth_format,
+                    )
+                    .await;
+                self.pipe_mapper.insert(handle, pipe);
+            }
+            "compute" => {
+                let pipe = self
+                    .process_compute_pipeline(pipe_content_json, shader_manager, gpu_interfaces)
+                    .await;
+                //tagging handle as compute
+                handle |= (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT);
+                self.compute_pipe_mapper.insert(handle, pipe);
+            }
+            _ => panic!("Requested pipeline type not supported"),
+        };
+
         self.pipe_path_mapper
             .insert(String::from(file_name), handle);
 
-        handle::ResourceHandle::new(handle::ResourceHandleType::RenderPipeline, handle)
+        handle::ResourceHandle::new(handle::ResourceHandleType::Pipeline, handle)
     }
     pub fn get_pipeline_from_handle(
         &self,
@@ -70,6 +76,14 @@ impl PipelineManager {
             None => return Err("could not find binding group layout"),
         };
         Ok(pipe)
+    }
+
+    pub fn is_raster_pipeline(&self, handle: &handle::ResourceHandle) -> bool {
+        let handle_type = handle.get_type();
+        let handle_value = handle.get_value();
+        assert!(handle_type == handle::ResourceHandleType::Pipeline);
+        let mask = (1 as u64) << (63 - handle::HANDLE_TYPE_BIT_COUNT);
+        (handle_value & mask) == 0
     }
 
     pub fn get_bind_group_from_handle(
@@ -158,6 +172,58 @@ impl PipelineManager {
         }
 
         set_bindings
+    }
+
+    async fn process_compute_pipeline(
+        &mut self,
+        pipe_content_json: Value,
+        shader_manager: &mut graphics::shader::ShaderManager,
+        gpu_interfaces: &graphics::api::GPUInterfaces,
+    ) -> wgpu::ComputePipeline {
+        let compute_name = pipe_content_json["compute"]["shader_name"]
+            .as_str()
+            .unwrap();
+        let cmp_handle = shader_manager
+            .load_shader_type(
+                &gpu_interfaces.device,
+                compute_name,
+                graphics::shader::ShaderType::COMPUPTE,
+            )
+            .await;
+
+        let cmp_module = shader_manager.get_shader_module(&cmp_handle).unwrap();
+
+        let layout_name = pipe_content_json["layout"].as_str().unwrap();
+        let bg_layout_handles = self.load_binding_group(layout_name, gpu_interfaces).await;
+
+        let mut layouts_to_bind = Vec::new();
+        for h in bg_layout_handles {
+            let bg_layout = self.get_bind_group_from_handle(&h);
+            layouts_to_bind.push(bg_layout.unwrap());
+        }
+
+        let render_pipeline_layout =
+            gpu_interfaces
+                .device
+                .create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
+                    bind_group_layouts: &layouts_to_bind[..],
+                });
+
+        ///// The layout of bind groups for this pipeline.
+        //pub layout: &'a PipelineLayout,
+
+        ///// The compiled compute stage and its entry point.
+        //pub compute_stage: ProgrammableStageDescriptor<'a>,
+
+        gpu_interfaces
+            .device
+            .create_compute_pipeline(&wgpu::ComputePipelineDescriptor {
+                layout: &render_pipeline_layout,
+                compute_stage: wgpu::ProgrammableStageDescriptor {
+                    module: &cmp_module,
+                    entry_point: "main",
+                },
+            })
     }
 
     async fn process_raster_pipeline(
@@ -361,7 +427,7 @@ fn get_vertex_attrbibute_descriptor(name: &str) -> Vec<wgpu::VertexBufferDescrip
     }
 }
 
-pub fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
+fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
     let mut out_vis = wgpu::ShaderStage::NONE;
     for visibility in visibilities {
         let visibility_str = visibility.as_str().unwrap();
@@ -377,7 +443,7 @@ pub fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
     out_vis
 }
 
-pub fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
+fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
     match type_str {
         //if is a uniform , we extract some extra data and return the built type
         "uniform" => {
@@ -412,7 +478,7 @@ pub fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType
     }
 }
 
-pub fn get_pipeline_color_states(
+fn get_pipeline_color_states(
     pipe_content_json: &Value,
     swap_chain_format: wgpu::TextureFormat,
 ) -> Vec<wgpu::ColorStateDescriptor> {
@@ -463,7 +529,7 @@ fn get_pipeline_color_format(
     }
 }
 
-pub fn get_pipeline_raster_state(pipe_content_json: &Value) -> wgpu::RasterizationStateDescriptor {
+fn get_pipeline_raster_state(pipe_content_json: &Value) -> wgpu::RasterizationStateDescriptor {
     let raster_value = &pipe_content_json["rasterization_state"];
     let raster_type = raster_value["type"].as_str().unwrap();
     match raster_type {

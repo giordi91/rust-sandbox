@@ -5,7 +5,7 @@ pub enum ResourceHandleType {
     Texture = 2,
     Mesh = 3,
     BindingGroup = 4,
-    RenderPipeline = 5,
+    Pipeline = 5,
     Buffer = 6,
     Invalid = !0,
 }

@@ -96,6 +96,17 @@ impl platform::Application for Sandbox {
             )
             .await;
 
+        let normal_compute_handle= engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_pipeline(
+                "resources/normal_compute.pipeline",
+                &mut engine_runtime.resource_managers.shader_manager,
+                &engine_runtime.gpu_interfaces,
+                default_depth_format,
+            )
+            .await;
+
         let depth_only_pipeline = engine_runtime
             .resource_managers
             .pipeline_manager

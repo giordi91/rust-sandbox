@@ -5,6 +5,7 @@ pub async fn compile_shader(file_name: &str, shader_type: &ShaderType) -> Vec<u3
     let compile_shader_type = match shader_type {
         ShaderType::VERTEX => shaderc::ShaderKind::Vertex,
         ShaderType::FRAGMENT => shaderc::ShaderKind::Fragment,
+        ShaderType::COMPUPTE=> shaderc::ShaderKind::Compute,
     };
 
     let contents = file_system::load_file_string(&file_name)
