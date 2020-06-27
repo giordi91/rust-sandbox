@@ -1,8 +1,5 @@
 #version 450
 
-layout(location=0) in vec3 a_position;
-layout(location=1) in vec3 a_normal;
-
 layout(location=0) out vec2  o_uv;
 
 layout(set=0, binding=0)
@@ -12,15 +9,19 @@ uniform Uniforms {
 };
 
 const vec4 positions[6] = vec4[6](
-    vec4(-1.0f, 1.0f, 0.0f, 0.0f), vec4(1.0f, 1.0f, 1.0f, 0.0f),
-    vec4(-1.0f, -1.0f, 0.0f, 1.0f), vec4(1.0f, -1.0f, 1.0f, 1.0f),
-	vec4(-1.0f, -1.0f, 0.0f, 1.0f),vec4(1.0f, 1.0f, 1.0f, 0.0f)
+    vec4(-1.0f, -1.0f, 0.0f, 1.0f), 
+    vec4(1.0f, 1.0f, 1.0f, 0.0f),
+    vec4(-1.0f, 1.0f, 0.0f, 0.0f), 
+    
+    vec4(1.0f, 1.0f, 1.0f, 0.0f),
+	vec4(-1.0f, -1.0f, 0.0f, 1.0f),
+    vec4(1.0f, -1.0f, 1.0f, 1.0f)
 );
 
 void main() {
     vec4 p = positions[gl_VertexIndex];
     o_uv = p.zw;
-    gl_Position = u_view_proj * vec4(p.xy, 0.0, 1.0);
+    gl_Position = vec4(p.xy, 0.00001, 1.0);
 }
 
 /*
