@@ -1,0 +1,17 @@
+{
+    "type": "raster",
+    "bindings": [
+        [
+            {
+                "slot": 0,
+                "visibility": [
+                    "vertex"
+                ],
+                "type": "uniform",
+                "uniform_config": {
+                    "dynamic": false
+                }
+            }
+        ]
+    ]
+}

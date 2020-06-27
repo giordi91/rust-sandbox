@@ -21,9 +21,11 @@ pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
     render_pipeline_handle: handle::ResourceHandle,
     depth_only_pipeline: handle::ResourceHandle,
+    normal_pipeline: handle::ResourceHandle,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
+    normal_bg: wgpu::BindGroup,
     per_object_bind_groups: Vec<wgpu::BindGroup>,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
@@ -74,6 +76,12 @@ impl platform::Application for Sandbox {
             .load_binding_group("resources/gltf_model.bg", gpu_interfaces)
             .await;
 
+        let normal_layout_handle = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_binding_group("resources/normal.bg", gpu_interfaces)
+            .await;
+
         let default_depth_format = wgpu::TextureFormat::Depth32Float;
 
         let render_pipeline_handle = engine_runtime
@@ -92,6 +100,17 @@ impl platform::Application for Sandbox {
             .pipeline_manager
             .load_pipeline(
                 "resources/depth_only.pipeline",
+                &mut engine_runtime.resource_managers.shader_manager,
+                &engine_runtime.gpu_interfaces,
+                default_depth_format,
+            )
+            .await;
+
+        let normal_pipeline = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_pipeline(
+                "resources/normal_depth.pipeline",
                 &mut engine_runtime.resource_managers.shader_manager,
                 &engine_runtime.gpu_interfaces,
                 default_depth_format,
@@ -121,11 +140,33 @@ impl platform::Application for Sandbox {
                     label: Some("uniform_bind_group"),
                 });
 
-        let ao_bg= engine_runtime
+        //let ao_bg = engine_runtime
+        //    .resource_managers
+        //    .pipeline_manager
+        //    .load_binding_group("resources/ao.bg", gpu_interfaces)
+        //    .await;
+
+
+        let normal_layout = engine_runtime
             .resource_managers
             .pipeline_manager
-            .load_binding_group("resources/ao.bg", gpu_interfaces)
-            .await;
+            .get_bind_group_from_handle(normal_layout_handle.get(0).unwrap());
+
+        let normal_bg=
+            gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &normal_layout.unwrap(),
+                    bindings: &[wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buffer,
+                            // FYI: you can share a single buffer between bindings.
+                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                        },
+                    }],
+                    label: Some("normal binding group"),
+                });
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
@@ -189,9 +230,11 @@ impl platform::Application for Sandbox {
             engine_runtime,
             render_pipeline_handle,
             depth_only_pipeline,
+            normal_pipeline,
             camera,
             uniform_buffer,
             uniform_bind_group,
+            normal_bg,
             per_object_bind_groups,
             size,
             color,
@@ -270,17 +313,17 @@ impl platform::Application for Sandbox {
             .get_next_texture()
             .expect("Timeout getting texture");
 
-        let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
-            attachment: &self.depth_texture.view,
-            depth_load_op: wgpu::LoadOp::Clear,
-            depth_store_op: wgpu::StoreOp::Store,
-            clear_depth: 0.0,
-            stencil_load_op: wgpu::LoadOp::Clear,
-            stencil_store_op: wgpu::StoreOp::Store,
-            clear_stencil: 0,
-        });
         //do the depth prepass
         {
+            let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.depth_texture.view,
+                depth_load_op: wgpu::LoadOp::Clear,
+                depth_store_op: wgpu::StoreOp::Store,
+                clear_depth: 0.0,
+                stencil_load_op: wgpu::LoadOp::Clear,
+                stencil_store_op: wgpu::StoreOp::Store,
+                clear_stencil: 0,
+            });
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[],
                 //color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -359,6 +402,49 @@ impl platform::Application for Sandbox {
                 }
                 counter += 1;
             }
+        }
+
+        //normal reconstruction
+        {
+            let depth_stencil_attachment = Some(wgpu::RenderPassDepthStencilAttachmentDescriptor {
+                attachment: &self.depth_texture.view,
+                depth_load_op: wgpu::LoadOp::Clear,
+                depth_store_op: wgpu::StoreOp::Store,
+                clear_depth: 0.0,
+                stencil_load_op: wgpu::LoadOp::Clear,
+                stencil_store_op: wgpu::StoreOp::Store,
+                clear_stencil: 0,
+            });
+            let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
+                color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
+                    attachment: &frame.view,
+                    resolve_target: None,
+                    load_op: wgpu::LoadOp::Clear,
+                    store_op: wgpu::StoreOp::Store,
+                    clear_color: wgpu::Color {
+                        r: 0.1,
+                        g: 0.2,
+                        b: self.color,
+                        a: 1.0,
+                    },
+                }],
+                depth_stencil_attachment,
+            });
+
+            //let render_pipeline = self
+            //    .engine_runtime
+            //    .resource_managers
+            //    .pipeline_manager
+            //    .get_pipeline_from_handle(&self.render_pipeline_handle);
+            let render_pipeline = self
+                .engine_runtime
+                .resource_managers
+                .pipeline_manager
+                .get_pipeline_from_handle(&self.normal_pipeline);
+            render_pass.set_pipeline(&render_pipeline.unwrap());
+            //set the per frame binding group
+            render_pass.set_bind_group(0, &self.normal_bg, &[]);
+            render_pass.draw(0..6, 0..1);
         }
 
         self.color += 0.001;
