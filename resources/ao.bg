@@ -30,7 +30,7 @@
             },
             {
                 "comment": "this is the depth texture sampler",
-                "slot": 0,
+                "slot": 1,
                 "visibility": [
                     "fragment"
                 ],
