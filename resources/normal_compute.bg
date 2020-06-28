@@ -42,7 +42,7 @@
                 "comment": "this is the output texture",
                 "slot": 2,
                 "visibility": [
-                    "fragment"
+                    "fragment","compute"
                 ],
                 "type": "storage_texture",
                 "texture_config": {

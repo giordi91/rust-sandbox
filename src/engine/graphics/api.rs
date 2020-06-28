@@ -27,6 +27,7 @@ pub struct ResourceManagers
 impl GPUInterfaces {
     pub async fn new(window: &Window, swapchain_format: wgpu::TextureFormat) -> Self {
         let size = window.inner_size();
+        println!("{:?}",size);
 
         let _instance = wgpu::Instance::new();
         let surface = unsafe { _instance.create_surface(window) };

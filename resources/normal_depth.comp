@@ -8,7 +8,7 @@ uniform Uniforms {
 
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
-layout(set = 1, binding = 2, rgb10_a2ui) uniform uimage2D output_tex;
+layout(set = 1, binding = 2, rg16f) uniform image2D output_tex;
 
 vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 {
@@ -24,7 +24,19 @@ layout(local_size_x = 16, local_size_y=16, local_size_z=1) in;
 
 void main() {
 
-    //ivec2 idx = gl_GlobalInvocationID.xy;
+    int w = 1024;
+    int h = 768;
+    vec2 whf = vec2(w,h);
+
+    uvec2 idx = gl_GlobalInvocationID.xy;
+    if((idx.x  <w) && (idx.y <h))
+    {
+      vec2 whoffset = vec2(idx.x,idx.y) + vec2(0.5);
+      vec2 uv = whoffset / whf;
+      
+      //float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
+      imageStore(output_tex,ivec2(idx),vec4(uv,0,1.0f));
+    }
     //float depth = texture(sampler2D(depth_texture, depth_sampler), vec2(i_uv.x,i_uv.y)).r;
     //vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 
     //vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));

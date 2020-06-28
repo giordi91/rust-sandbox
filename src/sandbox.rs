@@ -177,7 +177,7 @@ impl platform::Application for Sandbox {
             depth: 1,
             mip_level_count: 1,
             sample_count: 1,
-            format: wgpu::TextureFormat::Rgb10a2Unorm,
+            format: wgpu::TextureFormat::Rg16Float,
             //NOTE output attachment is temporary
             usage: wgpu::TextureUsage::SAMPLED
                 | wgpu::TextureUsage::STORAGE
@@ -520,9 +520,12 @@ impl platform::Application for Sandbox {
             cpass.set_pipeline(&pipeline.unwrap());
             cpass.set_bind_group(0, &self.normal_compute_bgs.get(0).unwrap(), &[]);
             cpass.set_bind_group(1, &self.normal_compute_bgs.get(1).unwrap(), &[]);
-            cpass.dispatch(1 as u32, 1, 1);
+            let gx =  1024/16;
+            let gy =  768/16;
+            cpass.dispatch(gx as u32, gy, 1);
         }
 
+        /*
         //normal reconstruction
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
@@ -557,6 +560,7 @@ impl platform::Application for Sandbox {
             render_pass.set_bind_group(1, &self.normal_bgs.get(1).unwrap(), &[]);
             render_pass.draw(0..6, 0..1);
         }
+        */
 
         self.color += 0.001;
         if self.color > 1.0 {
