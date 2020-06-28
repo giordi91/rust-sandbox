@@ -478,6 +478,7 @@ fn get_bind_group_type(
                 },
                 component_type: match texture_config["component_type"].as_str().unwrap() {
                     "uint" => wgpu::TextureComponentType::Uint,
+                    "float" => wgpu::TextureComponentType::Float,
                     _ => {
                         panic!("Texture componet type not yet supported please add it to the code")
                     }
@@ -499,6 +500,7 @@ fn get_bind_group_type(
                 },
                 component_type: match texture_config["component_type"].as_str().unwrap() {
                     "uint" => wgpu::TextureComponentType::Uint,
+                    "float" => wgpu::TextureComponentType::Float,
                     _ => {
                         panic!("Texture component type not yet supported please add it to the code")
                     }

@@ -16,7 +16,7 @@
     },
     "color_states": [
         {
-            "format": "Rgb10a2Unorm",
+            "format": "swap_chain_native",
             "color_blend": "replace",
             "alpha_blend": "replace"
         }

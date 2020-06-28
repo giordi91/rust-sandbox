@@ -15,7 +15,7 @@
         ],
         [
             {
-                "comment": "this is the depth texture we want to sample",
+                "comment": "this is the computed texture we want to sample",
                 "slot": 0,
                 "visibility": [
                     "fragment"
@@ -24,11 +24,11 @@
                 "texture_config": {
                     "multisampled": false,
                     "dimension": "2D",
-                    "component_type": "uint"
+                    "component_type": "float"
                 }
             },
             {
-                "comment": "this is the depth texture sampler",
+                "comment": "this is the sampler",
                 "slot": 1,
                 "visibility": [
                     "fragment"

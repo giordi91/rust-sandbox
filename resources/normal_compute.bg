@@ -47,7 +47,7 @@
                 "type": "storage_texture",
                 "texture_config": {
                     "dimension": "2D",
-                    "component_type": "uint",
+                    "component_type": "float",
                     "format": "Rgba32Float",
                     "readonly": false
                 }

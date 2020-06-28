@@ -220,11 +220,11 @@ impl platform::Application for Sandbox {
                 bindings: &[
                     wgpu::Binding {
                         binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                        resource: wgpu::BindingResource::TextureView(&render_target.view),
                     },
                     wgpu::Binding {
                         binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
+                        resource: wgpu::BindingResource::Sampler(&render_target.sampler),
                     },
                 ],
                 label: Some("normal binding group 2"),
@@ -525,12 +525,11 @@ impl platform::Application for Sandbox {
             cpass.dispatch(gx as u32, gy, 1);
         }
 
-        /*
         //normal reconstruction
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
-                    attachment: &self.render_target.view,
+                    attachment: &frame.view,
                     resolve_target: None,
                     load_op: wgpu::LoadOp::Clear,
                     store_op: wgpu::StoreOp::Store,
@@ -560,7 +559,6 @@ impl platform::Application for Sandbox {
             render_pass.set_bind_group(1, &self.normal_bgs.get(1).unwrap(), &[]);
             render_pass.draw(0..6, 0..1);
         }
-        */
 
         self.color += 0.001;
         if self.color > 1.0 {

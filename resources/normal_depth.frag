@@ -11,8 +11,8 @@ uniform Uniforms {
 
 
 
-layout(set = 1, binding = 0) uniform texture2D  depth_texture;
-layout(set = 1, binding = 1) uniform sampler depth_sampler;
+layout(set = 1, binding = 0) uniform texture2D  in_tex;
+layout(set = 1, binding = 1) uniform sampler in_tex_sampler;
 
 
 vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
@@ -26,8 +26,6 @@ vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 
 void main() {
 
-    float depth = texture(sampler2D(depth_texture, depth_sampler), vec2(i_uv.x,i_uv.y)).r;
-    vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 
-    vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));
-    f_color = vec4(normal*0.5 + 0.5, 1.0);
+    vec3 normal = texture(sampler2D(in_tex, in_tex_sampler), vec2(i_uv.x,1-i_uv.y)).rgb;
+    f_color = vec4(normal, 1.0);
 }
