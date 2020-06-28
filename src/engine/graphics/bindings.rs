@@ -126,7 +126,7 @@ impl PipelineManager {
                 let visibility_array = binding["visibility"].as_array().unwrap();
                 let visibility_bitfiled = get_bind_group_visibility(visibility_array);
                 let type_value = binding["type"].as_str().unwrap();
-                let binding_type = get_bind_group_type(type_value, binding);
+                let binding_type = get_bind_group_type(type_value, binding, gpu_interfaces.sc_desc.format);
 
                 bindings.push(wgpu::BindGroupLayoutEntry {
                     binding: slot,
@@ -443,7 +443,11 @@ fn get_bind_group_visibility(visibilities: &[Value]) -> wgpu::ShaderStage {
     out_vis
 }
 
-fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
+fn get_bind_group_type(
+    type_str: &str,
+    binding: &Value,
+    swap_chain_format: wgpu::TextureFormat,
+) -> wgpu::BindingType {
     match type_str {
         //if is a uniform , we extract some extra data and return the built type
         "uniform" => {
@@ -474,6 +478,26 @@ fn get_bind_group_type(type_str: &str, binding: &Value) -> wgpu::BindingType {
                 comparison: sampler_config["comparison"].as_bool().unwrap(),
             }
         }
+        "storage_texture" => {
+            let texture_config = &binding["texture_config"];
+            wgpu::BindingType::StorageTexture {
+                dimension: match texture_config["dimension"].as_str().unwrap() {
+                    "2D" => wgpu::TextureViewDimension::D2,
+                    _ => panic!("Texture dimension not yet supported please add it to the code"),
+                },
+                component_type: match texture_config["component_type"].as_str().unwrap() {
+                    "uint" => wgpu::TextureComponentType::Uint,
+                    _ => {
+                        panic!("Texture component type not yet supported please add it to the code")
+                    }
+                },
+                format: get_color_format(
+                    texture_config["format"].as_str().unwrap(),
+                    swap_chain_format,
+                ),
+                readonly: texture_config["readonly"].as_bool().unwrap(),
+            }
+        }
         _ => panic!("Unexpected binding group type {}", type_str),
     }
 }
@@ -488,7 +512,8 @@ fn get_pipeline_color_states(
     if color_exists {
         let mut color_states = Vec::new();
         for color_value in color_values.as_array().unwrap() {
-            let format = get_pipeline_color_format(color_value, swap_chain_format);
+            let format_str = color_value["format"].as_str().unwrap();
+            let format = get_color_format(format_str, swap_chain_format);
             let color_blend = get_pipeline_blend(color_value, "color_blend");
             let alpha_blend = get_pipeline_blend(color_value, "alpha_blend");
 
@@ -514,12 +539,11 @@ fn get_pipeline_blend(color_value: &Value, name: &str) -> wgpu::BlendDescriptor 
     }
 }
 
-fn get_pipeline_color_format(
-    color_value: &Value,
+fn get_color_format(
+    color_str: &str,
     swap_chain_format: wgpu::TextureFormat,
 ) -> wgpu::TextureFormat {
-    let format_str = color_value["format"].as_str().unwrap();
-    match format_str {
+    match color_str {
         "swap_chain_native" => swap_chain_format,
         "Rgb10a2Unorm" => wgpu::TextureFormat::Rgb10a2Unorm,
         _ => panic!(

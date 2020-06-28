@@ -1,0 +1,57 @@
+{
+    "type": "raster",
+    "bindings": [
+        [
+            {
+                "slot": 0,
+                "visibility": [
+                    "vertex","fragment"
+                ],
+                "type": "uniform",
+                "uniform_config": {
+                    "dynamic": false
+                }
+            }
+        ],
+        [
+            {
+                "comment": "this is the depth texture we want to sample",
+                "slot": 0,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "texture",
+                "texture_config": {
+                    "multisampled": false,
+                    "dimension": "2D",
+                    "component_type": "uint"
+                }
+            },
+            {
+                "comment": "this is the depth texture sampler",
+                "slot": 1,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "sampler",
+                "sampler_config": {
+                    "comparison": false
+                }
+            },
+            {
+                "comment": "this is the output texture",
+                "slot": 2,
+                "visibility": [
+                    "fragment"
+                ],
+                "type": "storage_texture",
+                "texture_config": {
+                    "dimension": "2D",
+                    "component_type": "uint",
+                    "format": "Rgb10a2Unorm",
+                    "readonly": false
+                }
+            }
+        ]
+    ]
+}

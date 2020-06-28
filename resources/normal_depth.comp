@@ -21,8 +21,25 @@ vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 
 void main() {
 
+    //ivec2 idx = gl_GlobalInvocationID.xy;
     //float depth = texture(sampler2D(depth_texture, depth_sampler), vec2(i_uv.x,i_uv.y)).r;
     //vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 
     //vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));
     //f_color = vec4(normal*0.5 + 0.5, 1.0);
 }
+
+/*
+float2 uv0 = uv; // center
+float2 uv1 = uv + float2(1, 0) / depth_dimensions; // right 
+float2 uv2 = uv + float2(0, 1) / depth_dimensions; // top
+
+float depth0 = texture_depth.SampleLevel(sampler_point_clamp, uv0, 0).r;
+float depth1 = texture_depth.SampleLevel(sampler_point_clamp, uv1, 0).r;
+float depth2 = texture_depth.SampleLevel(sampler_point_clamp, uv2, 0).r;
+
+float3 P0 = reconstructPosition(uv0, depth0, InverseViewProjection);
+float3 P1 = reconstructPosition(uv1, depth1, InverseViewProjection);
+float3 P2 = reconstructPosition(uv2, depth2, InverseViewProjection);
+
+float3 normal = normalize(cross(P2 - P0, P1 - P0));
+*/

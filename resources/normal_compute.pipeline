@@ -1,6 +1,6 @@
 {
     "type": "compute",
-    "layout": "resources/normal.bg",
+    "layout": "resources/normal_compute.bg",
     "compute": {
         "shader_name": "resources/normal_depth"
     }
