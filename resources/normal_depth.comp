@@ -8,7 +8,7 @@ uniform Uniforms {
 
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
-layout(set = 1, binding = 2, rg16f) uniform image2D output_tex;
+layout(set = 1, binding = 2, rgba32f) uniform image2D output_tex;
 
 vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 {
@@ -34,8 +34,20 @@ void main() {
       vec2 whoffset = vec2(idx.x,idx.y) + vec2(0.5);
       vec2 uv = whoffset / whf;
       
-      //float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
-      imageStore(output_tex,ivec2(idx),vec4(uv,0,1.0f));
+      whoffset = vec2(idx.x,idx.y) + vec2(1+ 0.5, 0.5);
+      vec2 uv1 = whoffset / whf;
+      whoffset = vec2(idx.x,idx.y) + vec2(0.5, 1+ 0.5);
+      vec2 uv2 = whoffset / whf;
+      
+      float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
+      float depth1 = texture(sampler2D(depth_texture, depth_sampler), uv1).r;
+      float depth2 = texture(sampler2D(depth_texture, depth_sampler), uv2).r;
+      vec3 pos0 = reconstructPosition(uv,depth, u_view_proj_inverse); 
+      vec3 pos1 = reconstructPosition(uv1,depth1, u_view_proj_inverse); 
+      vec3 pos2 = reconstructPosition(uv2,depth2, u_view_proj_inverse); 
+      vec3 normal =normalize(cross(pos2 - pos0, pos1 - pos0)) ;
+      imageStore(output_tex,ivec2(idx),vec4(normal,1.0f));
+      //imageStore(output_tex,ivec2(idx),vec4(depth2,0,0,1.0f));
     }
     //float depth = texture(sampler2D(depth_texture, depth_sampler), vec2(i_uv.x,i_uv.y)).r;
     //vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 

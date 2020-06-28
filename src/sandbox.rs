@@ -177,7 +177,7 @@ impl platform::Application for Sandbox {
             depth: 1,
             mip_level_count: 1,
             sample_count: 1,
-            format: wgpu::TextureFormat::Rg16Float,
+            format: wgpu::TextureFormat::Rgba32Float,
             //NOTE output attachment is temporary
             usage: wgpu::TextureUsage::SAMPLED
                 | wgpu::TextureUsage::STORAGE

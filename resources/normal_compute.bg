@@ -5,7 +5,7 @@
             {
                 "slot": 0,
                 "visibility": [
-                    "vertex","fragment"
+                    "vertex","fragment","compute"
                 ],
                 "type": "uniform",
                 "uniform_config": {
@@ -18,7 +18,7 @@
                 "comment": "this is the depth texture we want to sample",
                 "slot": 0,
                 "visibility": [
-                    "fragment"
+                    "fragment","compute"
                 ],
                 "type": "texture",
                 "texture_config": {
@@ -31,7 +31,7 @@
                 "comment": "this is the depth texture sampler",
                 "slot": 1,
                 "visibility": [
-                    "fragment"
+                    "fragment","compute"
                 ],
                 "type": "sampler",
                 "sampler_config": {
@@ -48,7 +48,7 @@
                 "texture_config": {
                     "dimension": "2D",
                     "component_type": "uint",
-                    "format": "Rgb10a2Unorm",
+                    "format": "Rgba32Float",
                     "readonly": false
                 }
             }
