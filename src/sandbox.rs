@@ -22,10 +22,12 @@ pub struct Sandbox {
     render_pipeline_handle: handle::ResourceHandle,
     depth_only_pipeline: handle::ResourceHandle,
     normal_pipeline: handle::ResourceHandle,
+    normal_compute_pipeline: handle::ResourceHandle,
     camera: graphics::camera::Camera,
     uniform_buffer: wgpu::Buffer,
     uniform_bind_group: wgpu::BindGroup,
     normal_bgs: Vec<wgpu::BindGroup>,
+    normal_compute_bgs: Vec<wgpu::BindGroup>,
     per_object_bind_groups: Vec<wgpu::BindGroup>,
     size: winit::dpi::PhysicalSize<u32>,
     color: f64,
@@ -83,6 +85,12 @@ impl platform::Application for Sandbox {
             .load_binding_group("resources/normal.bg", gpu_interfaces)
             .await;
 
+        let normal_compute_layout_handle = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .load_binding_group("resources/normal_compute.bg", gpu_interfaces)
+            .await;
+
         let default_depth_format = wgpu::TextureFormat::Depth32Float;
 
         let render_pipeline_handle = engine_runtime
@@ -96,7 +104,7 @@ impl platform::Application for Sandbox {
             )
             .await;
 
-        let normal_compute_handle= engine_runtime
+        let normal_compute_pipeline= engine_runtime
             .resource_managers
             .pipeline_manager
             .load_pipeline(
@@ -171,7 +179,9 @@ impl platform::Application for Sandbox {
             sample_count: 1,
             format: wgpu::TextureFormat::Rgb10a2Unorm,
             //NOTE output attachment is temporary
-            usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::STORAGE |wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+            usage: wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::STORAGE
+                | wgpu::TextureUsage::OUTPUT_ATTACHMENT,
         };
 
         let render_target = graphics::texture::Texture::create_texture_2D(
@@ -220,6 +230,52 @@ impl platform::Application for Sandbox {
                 label: Some("normal binding group 2"),
             });
         let normal_bgs = vec![normal_bg0, normal_bg1];
+
+        //doing the compute bindings
+        let normal_compute_layout0 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_compute_layout_handle.get(0).unwrap());
+        let normal_compute_layout1 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_compute_layout_handle.get(1).unwrap());
+
+        let normal_compute_bg0 = gpu_interfaces
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &normal_compute_layout0.unwrap(),
+                bindings: &[wgpu::Binding {
+                    binding: 0,
+                    resource: wgpu::BindingResource::Buffer {
+                        buffer: &uniform_buffer,
+                        range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                    },
+                }],
+                label: Some("normal compute binding group"),
+            });
+
+        let normal_compute_bg1 = gpu_interfaces
+            .device
+            .create_bind_group(&wgpu::BindGroupDescriptor {
+                layout: &normal_compute_layout1.unwrap(),
+                bindings: &[
+                    wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                    },
+                    wgpu::Binding {
+                        binding: 1,
+                        resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
+                    },
+                    wgpu::Binding{
+                        binding: 2,
+                        resource: wgpu::BindingResource::TextureView(&render_target.view),
+                    }
+                ],
+                label: Some("normal binding group 2"),
+            });
+        let normal_compute_bgs = vec![normal_compute_bg0, normal_compute_bg1];
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
@@ -278,10 +334,12 @@ impl platform::Application for Sandbox {
             render_pipeline_handle,
             depth_only_pipeline,
             normal_pipeline,
+            normal_compute_pipeline,
             camera,
             uniform_buffer,
             uniform_bind_group,
             normal_bgs,
+            normal_compute_bgs,
             per_object_bind_groups,
             size,
             color,
@@ -450,6 +508,19 @@ impl platform::Application for Sandbox {
                 }
                 counter += 1;
             }
+        }
+        {
+            let mut cpass = encoder.begin_compute_pass();
+
+            let pipeline = self
+                .engine_runtime
+                .resource_managers
+                .pipeline_manager
+                .get_compute_pipeline_from_handle(&self.normal_compute_pipeline);
+            cpass.set_pipeline(&pipeline.unwrap());
+            cpass.set_bind_group(0, &self.normal_compute_bgs.get(0).unwrap(), &[]);
+            cpass.set_bind_group(1, &self.normal_compute_bgs.get(1).unwrap(), &[]);
+            cpass.dispatch(1 as u32, 1, 1);
         }
 
         //normal reconstruction

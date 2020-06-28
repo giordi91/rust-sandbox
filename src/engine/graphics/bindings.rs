@@ -77,6 +77,18 @@ impl PipelineManager {
         };
         Ok(pipe)
     }
+    pub fn get_compute_pipeline_from_handle(
+        &self,
+        handle: &handle::ResourceHandle,
+    ) -> Result<&wgpu::ComputePipeline, &'static str> {
+        let value = handle.get_value();
+        assert!(!self.is_raster_pipeline(handle),"provided handle is not for a compute pipeline");
+        let pipe = match self.compute_pipe_mapper.get(&value) {
+            Some(pipe) => pipe,
+            None => return Err("could not find binding group layout"),
+        };
+        Ok(pipe)
+    }
 
     pub fn is_raster_pipeline(&self, handle: &handle::ResourceHandle) -> bool {
         let handle_type = handle.get_type();

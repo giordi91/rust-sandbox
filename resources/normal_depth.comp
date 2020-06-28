@@ -8,7 +8,7 @@ uniform Uniforms {
 
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
-
+layout(set = 1, binding = 2, rgb10_a2ui) uniform uimage2D output_tex;
 
 vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 {
@@ -18,6 +18,9 @@ vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
   vec4 position_v = InvVP* position_s;
   return position_v.xyz / position_v.w;
 }
+
+
+layout(local_size_x = 16, local_size_y=16, local_size_z=1) in;
 
 void main() {
 
