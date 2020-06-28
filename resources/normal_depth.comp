@@ -33,26 +33,86 @@ void main() {
     {
       vec2 whoffset = vec2(idx.x,idx.y) + vec2(0.5);
       vec2 uv = whoffset / whf;
-      
       whoffset = vec2(idx.x,idx.y) + vec2(1+ 0.5, 0.5);
       vec2 uv1 = whoffset / whf;
       whoffset = vec2(idx.x,idx.y) + vec2(0.5, 1+ 0.5);
+      vec2 uv4 = whoffset / whf;
+      whoffset = vec2(idx.x,idx.y) + vec2(-1 + 0.5,  0.5);
       vec2 uv2 = whoffset / whf;
+      whoffset = vec2(idx.x,idx.y) + vec2( + 0.5,  -1 + 0.5);
+      vec2 uv3 = whoffset / whf;
       
+
+  // 0: center
+  // 1: right
+  // 2: left
+  // 3: down
+  // 4: up
+
+
+      //center
       float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
       float depth1 = texture(sampler2D(depth_texture, depth_sampler), uv1).r;
       float depth2 = texture(sampler2D(depth_texture, depth_sampler), uv2).r;
-      vec3 pos0 = reconstructPosition(uv,depth, u_view_proj_inverse); 
-      vec3 pos1 = reconstructPosition(uv1,depth1, u_view_proj_inverse); 
-      vec3 pos2 = reconstructPosition(uv2,depth2, u_view_proj_inverse); 
-      vec3 normal =normalize(cross(pos2 - pos0, pos1 - pos0)) ;
-      imageStore(output_tex,ivec2(idx),vec4(normal,1.0f));
-      //imageStore(output_tex,ivec2(idx),vec4(depth2,0,0,1.0f));
-    }
+      float depth3 = texture(sampler2D(depth_texture, depth_sampler), uv3).r;
+      float depth4 = texture(sampler2D(depth_texture, depth_sampler), uv4).r;
+
+      float p0depth = depth;
+
+      const uint best_Z_horizontal = abs(depth1 - depth) < abs(depth2 - depth) ? 1 : 2;
+      const uint best_Z_vertical = abs(depth3 - depth) < abs(depth4 - depth) ? 3 : 4;
+
+
+
+vec3 P1; 
+vec3 P2;
+if (best_Z_horizontal == 1 && best_Z_vertical == 4)
+{
+      //P1 = float3(tile_XY[cross_idx[1]], tile_Z[cross_idx[1]]);
+      //P2 = float3(tile_XY[cross_idx[4]], tile_Z[cross_idx[4]]);
+      P1 = reconstructPosition(uv1,depth1, u_view_proj_inverse); 
+      P2 = reconstructPosition(uv4,depth4, u_view_proj_inverse); 
+}
+else if (best_Z_horizontal == 1 && best_Z_vertical == 3)
+{
+  //P1 = vec3(tile_XY[cross_idx[3]], tile_Z[cross_idx[3]]);
+  //P2 = vec3(tile_XY[cross_idx[1]], tile_Z[cross_idx[1]]);
+
+  P1 = reconstructPosition(uv3,depth3, u_view_proj_inverse); 
+  P2 = reconstructPosition(uv1,depth1, u_view_proj_inverse); 
+}
+else if (best_Z_horizontal == 2 && best_Z_vertical == 4)
+{
+  //P1 = vec3(tile_XY[cross_idx[4]], tile_Z[cross_idx[4]]);
+  //P2 = vec3(tile_XY[cross_idx[2]], tile_Z[cross_idx[2]]);
+  P1 = reconstructPosition(uv4,depth4, u_view_proj_inverse); 
+  P2 = reconstructPosition(uv2,depth2, u_view_proj_inverse); 
+}
+else if (best_Z_horizontal == 2 && best_Z_vertical == 3)
+{
+  //P1 = vec3(tile_XY[cross_idx[2]], tile_Z[cross_idx[2]]);
+  //P2 = vec3(tile_XY[cross_idx[3]], tile_Z[cross_idx[3]]);
+  P1 = reconstructPosition(uv2,depth2, u_view_proj_inverse); 
+  P2 = reconstructPosition(uv3,depth3, u_view_proj_inverse); 
+}
+
+const vec3 P0 = reconstructPosition(uv,depth, u_view_proj_inverse);
+const vec3 normal = normalize(cross(P2 - P0, P1 - P0));
+  imageStore(output_tex,ivec2(idx),vec4(normal,1.0f));
+
+
+
+      //vec3 pos0 = reconstructPosition(uv,depth, u_view_proj_inverse); 
+      //vec3 pos1 = reconstructPosition(uv1,depth1, u_view_proj_inverse); 
+      //vec3 pos2 = reconstructPosition(uv4,depth4, u_view_proj_inverse); 
+      //vec3 normal =normalize(cross(pos2 - pos0, pos1 - pos0)) ;
+      //imageStore(output_tex,ivec2(idx),vec4(normal,1.0f));
+
     //float depth = texture(sampler2D(depth_texture, depth_sampler), vec2(i_uv.x,i_uv.y)).r;
     //vec3 pos = reconstructPosition(i_uv,depth, u_view_proj_inverse); 
     //vec3 normal = normalize(cross(dFdx(pos), dFdy(pos)));
     //f_color = vec4(normal*0.5 + 0.5, 1.0);
+    }
 }
 
 /*
@@ -64,9 +124,9 @@ float depth0 = texture_depth.SampleLevel(sampler_point_clamp, uv0, 0).r;
 float depth1 = texture_depth.SampleLevel(sampler_point_clamp, uv1, 0).r;
 float depth2 = texture_depth.SampleLevel(sampler_point_clamp, uv2, 0).r;
 
-float3 P0 = reconstructPosition(uv0, depth0, InverseViewProjection);
-float3 P1 = reconstructPosition(uv1, depth1, InverseViewProjection);
-float3 P2 = reconstructPosition(uv2, depth2, InverseViewProjection);
+vec3 P0 = reconstructPosition(uv0, depth0, InverseViewProjection);
+vec3 P1 = reconstructPosition(uv1, depth1, InverseViewProjection);
+vec3 P2 = reconstructPosition(uv2, depth2, InverseViewProjection);
 
-float3 normal = normalize(cross(P2 - P0, P1 - P0));
+vec3 normal = normalize(cross(P2 - P0, P1 - P0));
 */
