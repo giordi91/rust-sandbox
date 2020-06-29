@@ -39,6 +39,7 @@ pub struct Sandbox {
     matrices_buffer: wgpu::Buffer,
 }
 
+
 #[async_trait(?Send)]
 impl platform::Application for Sandbox {
     async fn new(window: &Window, mut engine_runtime: platform::EngineRuntime) -> Self {
