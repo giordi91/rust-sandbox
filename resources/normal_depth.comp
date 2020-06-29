@@ -2,9 +2,21 @@
 
 layout(set=0, binding=0)
 uniform Uniforms {
-    mat4 u_view_proj; 
-    mat4 u_view_proj_inverse; 
+    mat4 view_proj; 
+    mat4 view_proj_inverse; 
+    uvec2 screen_size;
 };
+
+/*
+#extension GL_GOOGLE_include_directive: require
+
+#include "resources/structures.glsl"
+
+layout (set=0,binding=0) uniform InputData 
+{
+	FrameData frame_data;
+}; 
+*/
 
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
@@ -60,7 +72,7 @@ for (uint t =gl_LocalInvocationIndex ; t < tile_size* tile_size; t += group_size
   const uvec2 pixel = tile_upperleft + unflatten2D(t, tile_size);
   const vec2 uv = (pixel + 0.5f) * (1/whf);
   float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
-  const vec3 position = reconstructPosition(uv, depth, u_view_proj_inverse);
+  const vec3 position = reconstructPosition(uv, depth, view_proj_inverse);
   memory_tile[t] = position;
 }
     barrier();
@@ -91,7 +103,11 @@ const uint cross_idx[5] = {
 
 	vec3 p1 = vec3(0,0,0);
 	vec3 p2 = vec3(0,0,0);
-	if (best_Z_horizontal == 1 && best_Z_vertical == 4)
+
+  //uint rightup = uint(best_Z_horizontal == 1) & uint(best_Z_vertical == 4);
+	//p1 = vec3(memory_tile[cross_idx[1]].xy, memory_tile[cross_idx[1]].z) * rightup;
+	//p2 = vec3(memory_tile[cross_idx[4]].xy, memory_tile[cross_idx[4]].z) * rightup;
+	if (best_Z_horizontal == 1 && best_Z_vertical == 4 )
 	{
 		p1 = vec3(memory_tile[cross_idx[1]].xy, memory_tile[cross_idx[1]].z);
 		p2 = vec3(memory_tile[cross_idx[4]].xy, memory_tile[cross_idx[4]].z);
