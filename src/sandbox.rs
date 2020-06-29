@@ -520,8 +520,8 @@ impl platform::Application for Sandbox {
             cpass.set_pipeline(&pipeline.unwrap());
             cpass.set_bind_group(0, &self.normal_compute_bgs.get(0).unwrap(), &[]);
             cpass.set_bind_group(1, &self.normal_compute_bgs.get(1).unwrap(), &[]);
-            let gx =  1024/16;
-            let gy =  768/16;
+            let gx =  1024/8;
+            let gy =  768/8;
             cpass.dispatch(gx as u32, gy, 1);
         }
 
