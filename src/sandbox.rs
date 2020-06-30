@@ -449,6 +449,7 @@ impl platform::Application for Sandbox {
         //resouces depending on size
         self.engine_runtime.gpu_interfaces.resize(new_size);
         self.size = new_size;
+        self.camera.aspect = (new_size.width as f32) /(new_size.height as f32);
 
 
         let (per_frame_data, uniform_buffer, uniform_bind_group) = Sandbox::create_depth_prepass_bg(
