@@ -1,22 +1,12 @@
 #version 450
 
+/*
 layout(set=0, binding=0)
 uniform Uniforms {
     mat4 view_proj; 
     mat4 view_proj_inverse; 
     uvec2 screen_size;
 };
-
-/*
-#extension GL_GOOGLE_include_directive: require
-
-#include "resources/structures.glsl"
-
-layout (set=0,binding=0) uniform InputData 
-{
-	FrameData frame_data;
-}; 
-*/
 
 vec2 OctWrap(vec2 v) {
   vec2 rhs = vec2(
@@ -33,18 +23,19 @@ vec2 EncodeOctNormal(vec3 n) {
   n.xy = n.xy * 0.5f + 0.5f;
   return n.xy;
 }
+*/
 
-vec3 DecodeOctNormal(vec2 f) {
-  f = f * 2.0f - 1.0f;
 
-  // https://twitter.com/Stubbesaurus/status/937994790553227264
-  vec3 n = vec3(f.x, f.y, 1.0f - abs(f.x) - abs(f.y));
-  float t = clamp(-n.z,0.0,1.0);
-  //n.xy += n.xy >= 0.0f ? -t : t;
-  n.x += n.x >= 0.0f ? -t : t;
-  n.y += n.y >= 0.0f ? -t : t;
-  return normalize(n);
-}
+#extension GL_GOOGLE_include_directive: require
+
+#include "resources/structures.glsl"
+#include "resources/normals.glsl"
+
+layout (set=0,binding=0) uniform InputData 
+{
+	FrameData frame_data;
+}; 
+
 
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
@@ -104,7 +95,7 @@ for (uint t =gl_LocalInvocationIndex ; t < tile_size* tile_size; t += group_size
   const uvec2 pixel = tile_upperleft + unflatten2D(t, tile_size);
   const vec2 uv = (pixel + 0.5f) * (1/whf);
   float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
-  const vec3 position = reconstructPosition(uv, depth, view_proj_inverse);
+  const vec3 position = reconstructPosition(uv, depth, frame_data.view_proj_inverse);
   memory_tile[t] = position;
 }
     barrier();
