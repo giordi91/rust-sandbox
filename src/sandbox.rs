@@ -207,7 +207,7 @@ impl Sandbox {
             depth: 1,
             mip_level_count: 1,
             sample_count: 1,
-            format: wgpu::TextureFormat::Rgba32Float,
+            format: wgpu::TextureFormat::Rg16Float,
             //NOTE output attachment is temporary
             usage: wgpu::TextureUsage::SAMPLED
                 | wgpu::TextureUsage::STORAGE
@@ -229,6 +229,8 @@ impl Sandbox {
     ) -> (graphics::FrameData, wgpu::Buffer, wgpu::BindGroup) {
         let mut per_frame_data = graphics::FrameData::new();
         per_frame_data.update_view_proj(&camera);
+        per_frame_data.screen_size.x = engine_runtime.gpu_interfaces.sc_desc.width;
+        per_frame_data.screen_size.y = engine_runtime.gpu_interfaces.sc_desc.height;
 
         let uniform_buffer = engine_runtime
             .gpu_interfaces
@@ -449,8 +451,7 @@ impl platform::Application for Sandbox {
         //resouces depending on size
         self.engine_runtime.gpu_interfaces.resize(new_size);
         self.size = new_size;
-        self.camera.aspect = (new_size.width as f32) /(new_size.height as f32);
-
+        self.camera.aspect = (new_size.width as f32) / (new_size.height as f32);
 
         let (per_frame_data, uniform_buffer, uniform_bind_group) = Sandbox::create_depth_prepass_bg(
             &self.engine_runtime,
@@ -613,6 +614,7 @@ impl platform::Application for Sandbox {
                 counter += 1;
             }
         }
+        //normal reconstruction
         {
             let mut cpass = encoder.begin_compute_pass();
 
@@ -626,18 +628,12 @@ impl platform::Application for Sandbox {
             cpass.set_bind_group(1, &self.normal_compute_bgs.get(1).unwrap(), &[]);
             let w = self.size.width;
             let h = self.size.height;
-            let gx = match (w % 8) == 0 {
-                true => w / 8,
-                false => w / 8 + 1,
-            };
-            let gy = match (h % 8) == 0 {
-                true => h / 8,
-                false => h / 8 + 1,
-            };
+            let gx = if (w % 8) == 0 { w / 8 } else { w / 8 + 1 };
+            let gy = if (h % 8) == 0 { h / 8 } else { h / 8 + 1 };
             cpass.dispatch(gx, gy, 1);
         }
 
-        //normal reconstruction
+        //final draw
         {
             let mut render_pass = encoder.begin_render_pass(&wgpu::RenderPassDescriptor {
                 color_attachments: &[wgpu::RenderPassColorAttachmentDescriptor {
@@ -655,11 +651,6 @@ impl platform::Application for Sandbox {
                 depth_stencil_attachment: None,
             });
 
-            //let render_pipeline = self
-            //    .engine_runtime
-            //    .resource_managers
-            //    .pipeline_manager
-            //    .get_pipeline_from_handle(&self.render_pipeline_handle);
             let render_pipeline = self
                 .engine_runtime
                 .resource_managers

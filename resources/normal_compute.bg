@@ -48,7 +48,7 @@
                 "texture_config": {
                     "dimension": "2D",
                     "component_type": "float",
-                    "format": "Rgba32Float",
+                    "format": "Rg16Float",
                     "readonly": false
                 }
             },

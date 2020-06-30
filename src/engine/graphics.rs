@@ -11,8 +11,9 @@ pub mod buffer;
 #[repr(C)] // We need this for Rust to store our data correctly for the shaders
 #[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
 pub struct FrameData {
-    view_proj: cgmath::Matrix4<f32>,
-    view_proj_inverse: cgmath::Matrix4<f32>,
+    pub view_proj: cgmath::Matrix4<f32>,
+    pub view_proj_inverse: cgmath::Matrix4<f32>,
+    pub screen_size: cgmath::Vector2<u32>
 }
 
 impl FrameData {
@@ -21,6 +22,7 @@ impl FrameData {
         Self {
             view_proj: cgmath::Matrix4::identity(),
             view_proj_inverse: cgmath::Matrix4::identity(),
+            screen_size: cgmath::Vector2::<u32>::new(0,0),
         }
     }
 

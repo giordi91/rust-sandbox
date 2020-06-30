@@ -18,6 +18,34 @@ layout (set=0,binding=0) uniform InputData
 }; 
 */
 
+vec2 OctWrap(vec2 v) {
+  vec2 rhs = vec2(
+    v.x > 0.0 ? 1.0 : -1.0,
+    v.y > 0.0 ? 1.0 : -1.0
+    );
+  return (vec2(1.0) - abs(v.yx)) * rhs;
+}
+
+
+vec2 EncodeOctNormal(vec3 n) {
+  n /= (abs(n.x) + abs(n.y) + abs(n.z));
+  n.xy = n.z >= 0.0f ? n.xy : OctWrap(n.xy);
+  n.xy = n.xy * 0.5f + 0.5f;
+  return n.xy;
+}
+
+vec3 DecodeOctNormal(vec2 f) {
+  f = f * 2.0f - 1.0f;
+
+  // https://twitter.com/Stubbesaurus/status/937994790553227264
+  vec3 n = vec3(f.x, f.y, 1.0f - abs(f.x) - abs(f.y));
+  float t = clamp(-n.z,0.0,1.0);
+  //n.xy += n.xy >= 0.0f ? -t : t;
+  n.x += n.x >= 0.0f ? -t : t;
+  n.y += n.y >= 0.0f ? -t : t;
+  return normalize(n);
+}
+
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
 layout(set = 1, binding = 2, rgba32f) uniform image2D output_tex;
@@ -139,7 +167,7 @@ const uint cross_idx[5] = {
 
       //load from memory and write out
       //vec3 loaded_depth = memory_tile[flatten2D(uvec2(tile_border,tile_border) + gl_LocalInvocationID.xy,tile_size)];
-      imageStore(output_tex,ivec2(idx),vec4(normal,1.0f));
+      imageStore(output_tex,ivec2(idx),vec4(EncodeOctNormal(normal),0,1.0f));
       //imageStore(output_tex,ivec2(idx),vec4(best_Z_horizontal == 1,best_Z_horizontal==2,0,1.0f));
       //float depth = texture(sampler2D(depth_texture, depth_sampler), uv).r;
       //imageStore(output_tex,ivec2(idx),vec4(depth*20,0,0,1.0f));
