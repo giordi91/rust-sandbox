@@ -47,12 +47,14 @@ pub struct Sandbox {
     depth_texture: graphics::texture::Texture,
     render_target: graphics::texture::Texture,
     matrices_buffer: wgpu::Buffer,
+    layout_handles: Vec<handle::ResourceHandle>,
+    normal_layout_handle: Vec<handle::ResourceHandle>,
+    normal_compute_layout_handle: Vec<handle::ResourceHandle>,
 }
 
 impl Sandbox {
     fn create_normal_compue_bg(
         engine_runtime: &platform::EngineRuntime,
-        gpu_interfaces: &graphics::api::GPUInterfaces,
         uniform_buffer: &wgpu::Buffer,
         per_frame_data: &graphics::FrameData,
         depth_texture: &graphics::texture::Texture,
@@ -74,7 +76,8 @@ impl Sandbox {
             .get_bind_group_from_handle(normal_compute_layout_handle.get(1).unwrap());
 
         let normal_compute_bg0 =
-            gpu_interfaces
+            engine_runtime
+                .gpu_interfaces
                 .device
                 .create_bind_group(&wgpu::BindGroupDescriptor {
                     layout: &normal_compute_layout0.unwrap(),
@@ -89,16 +92,23 @@ impl Sandbox {
                 });
 
         let normal_config = NormalReconstructionConfig {
-            texture_size: cgmath::vec2(gpu_interfaces.sc_desc.width, gpu_interfaces.sc_desc.height),
+            texture_size: cgmath::vec2(
+                engine_runtime.gpu_interfaces.sc_desc.width,
+                engine_runtime.gpu_interfaces.sc_desc.height,
+            ),
         };
 
-        let normal_config_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[normal_config]),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
+        let normal_config_buffer = engine_runtime
+            .gpu_interfaces
+            .device
+            .create_buffer_with_data(
+                bytemuck::cast_slice(&[normal_config]),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
 
         let normal_compute_bg1 =
-            gpu_interfaces
+            engine_runtime
+                .gpu_interfaces
                 .device
                 .create_bind_group(&wgpu::BindGroupDescriptor {
                     layout: &normal_compute_layout1.unwrap(),
@@ -129,6 +139,129 @@ impl Sandbox {
         let normal_compute_bgs = vec![normal_compute_bg0, normal_compute_bg1];
         (normal_config, normal_config_buffer, normal_compute_bgs)
     }
+
+    fn create_normal_bg(
+        engine_runtime: &platform::EngineRuntime,
+        uniform_buffer: &wgpu::Buffer,
+        per_frame_data: &graphics::FrameData,
+        render_target: &graphics::texture::Texture,
+        normal_layout_handle: &Vec<handle::ResourceHandle>,
+    ) -> Vec<wgpu::BindGroup> {
+        let normal_layout0 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_layout_handle.get(0).unwrap());
+        let normal_layout1 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_layout_handle.get(1).unwrap());
+
+        let normal_bg0 =
+            engine_runtime
+                .gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &normal_layout0.unwrap(),
+                    bindings: &[wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buffer,
+                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                        },
+                    }],
+                    label: Some("normal binding group"),
+                });
+
+        let normal_bg1 =
+            engine_runtime
+                .gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &normal_layout1.unwrap(),
+                    bindings: &[
+                        wgpu::Binding {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&render_target.view),
+                        },
+                        wgpu::Binding {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&render_target.sampler),
+                        },
+                    ],
+                    label: Some("normal binding group 2"),
+                });
+        vec![normal_bg0, normal_bg1]
+    }
+
+    fn allocate_textures(
+        engine_runtime: &platform::EngineRuntime,
+    ) -> (graphics::texture::Texture, graphics::texture::Texture) {
+        let depth_texture = graphics::texture::Texture::create_depth_texture(
+            &engine_runtime.gpu_interfaces.device,
+            &engine_runtime.gpu_interfaces.sc_desc,
+            "swap-depth",
+        );
+        let texture_request = graphics::texture::TextureRequest {
+            width: engine_runtime.gpu_interfaces.sc_desc.width,
+            height: engine_runtime.gpu_interfaces.sc_desc.height,
+            depth: 1,
+            mip_level_count: 1,
+            sample_count: 1,
+            format: wgpu::TextureFormat::Rgba32Float,
+            //NOTE output attachment is temporary
+            usage: wgpu::TextureUsage::SAMPLED
+                | wgpu::TextureUsage::STORAGE
+                | wgpu::TextureUsage::OUTPUT_ATTACHMENT,
+        };
+
+        let render_target = graphics::texture::Texture::create_texture_2D(
+            &engine_runtime.gpu_interfaces.device,
+            texture_request,
+            "render-target",
+        );
+        (depth_texture, render_target)
+    }
+
+    fn create_depth_prepass_bg(
+        engine_runtime: &platform::EngineRuntime,
+        layout_handles: &Vec<handle::ResourceHandle>,
+        camera: &graphics::camera::Camera,
+    ) -> (graphics::FrameData, wgpu::Buffer, wgpu::BindGroup) {
+        let mut per_frame_data = graphics::FrameData::new();
+        per_frame_data.update_view_proj(&camera);
+
+        let uniform_buffer = engine_runtime
+            .gpu_interfaces
+            .device
+            .create_buffer_with_data(
+                bytemuck::cast_slice(&[per_frame_data]),
+                wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+            );
+
+        let bg_layout = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(layout_handles.get(0).unwrap());
+
+        let uniform_bind_group =
+            engine_runtime
+                .gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &bg_layout.unwrap(),
+                    bindings: &[wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buffer,
+                            // FYI: you can share a single buffer between bindings.
+                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                        },
+                    }],
+                    label: Some("uniform_bind_group"),
+                });
+
+        (per_frame_data, uniform_buffer, uniform_bind_group)
+    }
 }
 
 #[async_trait(?Send)]
@@ -153,14 +286,6 @@ impl platform::Application for Sandbox {
         };
 
         let camera_controller = graphics::camera::CameraControllerFPS::new(10.0);
-
-        let mut per_frame_data = graphics::FrameData::new();
-        per_frame_data.update_view_proj(&camera);
-
-        let uniform_buffer = gpu_interfaces.device.create_buffer_with_data(
-            bytemuck::cast_slice(&[per_frame_data]),
-            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
-        );
 
         let layout_handles = engine_runtime
             .resource_managers
@@ -217,96 +342,22 @@ impl platform::Application for Sandbox {
 
         platform::core::to_console("NEW3!");
 
-        let bg_layout = engine_runtime
-            .resource_managers
-            .pipeline_manager
-            .get_bind_group_from_handle(layout_handles.get(0).unwrap());
+        let (per_frame_data, uniform_buffer, uniform_bind_group) =
+            Sandbox::create_depth_prepass_bg(&engine_runtime, &layout_handles, &camera);
 
-        let uniform_bind_group =
-            gpu_interfaces
-                .device
-                .create_bind_group(&wgpu::BindGroupDescriptor {
-                    layout: &bg_layout.unwrap(),
-                    bindings: &[wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::Buffer {
-                            buffer: &uniform_buffer,
-                            // FYI: you can share a single buffer between bindings.
-                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
-                        },
-                    }],
-                    label: Some("uniform_bind_group"),
-                });
+        let (depth_texture, render_target) = Sandbox::allocate_textures(&engine_runtime);
 
-        let depth_texture = graphics::texture::Texture::create_depth_texture(
-            &engine_runtime.gpu_interfaces.device,
-            &engine_runtime.gpu_interfaces.sc_desc,
-            "swap-depth",
+        let normal_bgs = Sandbox::create_normal_bg(
+            &engine_runtime,
+            &uniform_buffer,
+            &per_frame_data,
+            &render_target,
+            &normal_layout_handle,
         );
-        let texture_request = graphics::texture::TextureRequest {
-            width: engine_runtime.gpu_interfaces.sc_desc.width,
-            height: engine_runtime.gpu_interfaces.sc_desc.height,
-            depth: 1,
-            mip_level_count: 1,
-            sample_count: 1,
-            format: wgpu::TextureFormat::Rgba32Float,
-            //NOTE output attachment is temporary
-            usage: wgpu::TextureUsage::SAMPLED
-                | wgpu::TextureUsage::STORAGE
-                | wgpu::TextureUsage::OUTPUT_ATTACHMENT,
-        };
-
-        let render_target = graphics::texture::Texture::create_texture_2D(
-            &engine_runtime.gpu_interfaces.device,
-            texture_request,
-            "render-target",
-        );
-
-        let normal_layout0 = engine_runtime
-            .resource_managers
-            .pipeline_manager
-            .get_bind_group_from_handle(normal_layout_handle.get(0).unwrap());
-        let normal_layout1 = engine_runtime
-            .resource_managers
-            .pipeline_manager
-            .get_bind_group_from_handle(normal_layout_handle.get(1).unwrap());
-
-        let normal_bg0 = gpu_interfaces
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &normal_layout0.unwrap(),
-                bindings: &[wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buffer,
-                        range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
-                    },
-                }],
-                label: Some("normal binding group"),
-            });
-
-        let normal_bg1 = gpu_interfaces
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &normal_layout1.unwrap(),
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&render_target.view),
-                    },
-                    wgpu::Binding {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&render_target.sampler),
-                    },
-                ],
-                label: Some("normal binding group 2"),
-            });
-        let normal_bgs = vec![normal_bg0, normal_bg1];
 
         let (normal_config, normal_config_buffer, normal_compute_bgs) =
             Sandbox::create_normal_compue_bg(
                 &engine_runtime,
-                &gpu_interfaces,
                 &uniform_buffer,
                 &per_frame_data,
                 &depth_texture,
@@ -387,44 +438,54 @@ impl platform::Application for Sandbox {
             depth_texture,
             render_target,
             matrices_buffer,
+            layout_handles,
+            normal_layout_handle,
+            normal_compute_layout_handle,
         }
     }
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
+        //we update the basic core size first, then we re-create all the necessary
+        //resouces depending on size
         self.engine_runtime.gpu_interfaces.resize(new_size);
-        self.normal_config.texture_size.x = new_size.width;
-        self.normal_config.texture_size.y = new_size.height;
         self.size = new_size;
 
-        let mut encoder = self
-            .engine_runtime
-            .gpu_interfaces
-            .device
-            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
-                label: Some("resize encoder"),
-            });
 
-        let staging_buffer = self
-            .engine_runtime
-            .gpu_interfaces
-            .device
-            .create_buffer_with_data(
-                bytemuck::cast_slice(&[self.normal_config]),
-                wgpu::BufferUsage::COPY_SRC,
-            );
-
-        encoder.copy_buffer_to_buffer(
-            &staging_buffer,
-            0,
-            &self.normal_config_buffer,
-            0,
-            std::mem::size_of::<NormalReconstructionConfig>() as wgpu::BufferAddress,
+        let (per_frame_data, uniform_buffer, uniform_bind_group) = Sandbox::create_depth_prepass_bg(
+            &self.engine_runtime,
+            &self.layout_handles,
+            &self.camera,
         );
 
-        self.engine_runtime
-            .gpu_interfaces
-            .queue
-            .submit(Some(encoder.finish()));
+        self.per_frame_data = per_frame_data;
+        self.uniform_buffer = uniform_buffer;
+        self.uniform_bind_group = uniform_bind_group;
+
+        let (depth_texture, render_target) = Sandbox::allocate_textures(&self.engine_runtime);
+        self.depth_texture = depth_texture;
+        self.render_target = render_target;
+
+        self.normal_bgs = Sandbox::create_normal_bg(
+            &self.engine_runtime,
+            &self.uniform_buffer,
+            &self.per_frame_data,
+            &self.render_target,
+            &self.normal_layout_handle,
+        );
+
+        let (normal_config, normal_config_buffer, normal_compute_bgs) =
+            Sandbox::create_normal_compue_bg(
+                &self.engine_runtime,
+                &self.uniform_buffer,
+                &self.per_frame_data,
+                &self.depth_texture,
+                &self.render_target,
+                &self.normal_compute_layout_handle,
+            );
+
+        self.normal_config = normal_config;
+        self.normal_config_buffer = normal_config_buffer;
+        self.normal_compute_bgs = normal_compute_bgs;
     }
 
     // input() won't deal with GPU code, so it can be synchronous
