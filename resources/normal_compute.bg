@@ -51,6 +51,17 @@
                     "format": "Rgba32Float",
                     "readonly": false
                 }
+            },
+            {
+                "comment": "this is the shader config buffer",
+                "slot": 3,
+                "visibility": [
+                    "compute"
+                ],
+                "type": "uniform",
+                "uniform_config": {
+                    "dynamic": false
+                }
             }
         ]
     ]

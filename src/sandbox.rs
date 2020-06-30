@@ -14,8 +14,16 @@ pub struct ObjectBuffer {
     pad2: cgmath::Matrix4<f32>,
     pad3: cgmath::Matrix4<f32>,
 }
+
+#[repr(C)] // We need this for Rust to store our data correctly for the shaders
+#[derive(Debug, Copy, Clone)] // This is so we can store this in a buffer
+pub struct NormalReconstructionConfig {
+    texture_size: cgmath::Vector2<u32>,
+}
 unsafe impl bytemuck::Pod for ObjectBuffer {}
 unsafe impl bytemuck::Zeroable for ObjectBuffer {}
+unsafe impl bytemuck::Pod for NormalReconstructionConfig {}
+unsafe impl bytemuck::Zeroable for NormalReconstructionConfig {}
 
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
@@ -31,6 +39,8 @@ pub struct Sandbox {
     size: winit::dpi::PhysicalSize<u32>,
     camera_controller: graphics::camera::CameraControllerFPS,
     per_frame_data: graphics::FrameData,
+    normal_config: NormalReconstructionConfig,
+    normal_config_buffer: wgpu::Buffer,
     time_stamp: u64,
     delta_time: u64,
     gltf_file: graphics::model::GltfFile,
@@ -39,6 +49,87 @@ pub struct Sandbox {
     matrices_buffer: wgpu::Buffer,
 }
 
+impl Sandbox {
+    fn create_normal_compue_bg(
+        engine_runtime: &platform::EngineRuntime,
+        gpu_interfaces: &graphics::api::GPUInterfaces,
+        uniform_buffer: &wgpu::Buffer,
+        per_frame_data: &graphics::FrameData,
+        depth_texture: &graphics::texture::Texture,
+        render_target: &graphics::texture::Texture,
+        normal_compute_layout_handle: &Vec<handle::ResourceHandle>,
+    ) -> (
+        NormalReconstructionConfig,
+        wgpu::Buffer,
+        Vec<wgpu::BindGroup>,
+    ) {
+        //doing the compute bindings
+        let normal_compute_layout0 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_compute_layout_handle.get(0).unwrap());
+        let normal_compute_layout1 = engine_runtime
+            .resource_managers
+            .pipeline_manager
+            .get_bind_group_from_handle(normal_compute_layout_handle.get(1).unwrap());
+
+        let normal_compute_bg0 =
+            gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &normal_compute_layout0.unwrap(),
+                    bindings: &[wgpu::Binding {
+                        binding: 0,
+                        resource: wgpu::BindingResource::Buffer {
+                            buffer: &uniform_buffer,
+                            range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
+                        },
+                    }],
+                    label: Some("normal compute binding group"),
+                });
+
+        let normal_config = NormalReconstructionConfig {
+            texture_size: cgmath::vec2(gpu_interfaces.sc_desc.width, gpu_interfaces.sc_desc.height),
+        };
+
+        let normal_config_buffer = gpu_interfaces.device.create_buffer_with_data(
+            bytemuck::cast_slice(&[normal_config]),
+            wgpu::BufferUsage::UNIFORM | wgpu::BufferUsage::COPY_DST,
+        );
+
+        let normal_compute_bg1 =
+            gpu_interfaces
+                .device
+                .create_bind_group(&wgpu::BindGroupDescriptor {
+                    layout: &normal_compute_layout1.unwrap(),
+                    bindings: &[
+                        wgpu::Binding {
+                            binding: 0,
+                            resource: wgpu::BindingResource::TextureView(&depth_texture.view),
+                        },
+                        wgpu::Binding {
+                            binding: 1,
+                            resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
+                        },
+                        wgpu::Binding {
+                            binding: 2,
+                            resource: wgpu::BindingResource::TextureView(&render_target.view),
+                        },
+                        wgpu::Binding {
+                            binding: 3,
+                            resource: wgpu::BindingResource::Buffer {
+                                buffer: &normal_config_buffer,
+                                range: 0..std::mem::size_of_val(&normal_config)
+                                    as wgpu::BufferAddress,
+                            },
+                        },
+                    ],
+                    label: Some("normal binding group 2"),
+                });
+        let normal_compute_bgs = vec![normal_compute_bg0, normal_compute_bg1];
+        (normal_config, normal_config_buffer, normal_compute_bgs)
+    }
+}
 
 #[async_trait(?Send)]
 impl platform::Application for Sandbox {
@@ -91,7 +182,7 @@ impl platform::Application for Sandbox {
 
         let default_depth_format = wgpu::TextureFormat::Depth32Float;
 
-        let normal_compute_pipeline= engine_runtime
+        let normal_compute_pipeline = engine_runtime
             .resource_managers
             .pipeline_manager
             .load_pipeline(
@@ -146,12 +237,6 @@ impl platform::Application for Sandbox {
                     }],
                     label: Some("uniform_bind_group"),
                 });
-
-        //let ao_bg = engine_runtime
-        //    .resource_managers
-        //    .pipeline_manager
-        //    .load_binding_group("resources/ao.bg", gpu_interfaces)
-        //    .await;
 
         let depth_texture = graphics::texture::Texture::create_depth_texture(
             &engine_runtime.gpu_interfaces.device,
@@ -218,51 +303,16 @@ impl platform::Application for Sandbox {
             });
         let normal_bgs = vec![normal_bg0, normal_bg1];
 
-        //doing the compute bindings
-        let normal_compute_layout0 = engine_runtime
-            .resource_managers
-            .pipeline_manager
-            .get_bind_group_from_handle(normal_compute_layout_handle.get(0).unwrap());
-        let normal_compute_layout1 = engine_runtime
-            .resource_managers
-            .pipeline_manager
-            .get_bind_group_from_handle(normal_compute_layout_handle.get(1).unwrap());
-
-        let normal_compute_bg0 = gpu_interfaces
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &normal_compute_layout0.unwrap(),
-                bindings: &[wgpu::Binding {
-                    binding: 0,
-                    resource: wgpu::BindingResource::Buffer {
-                        buffer: &uniform_buffer,
-                        range: 0..std::mem::size_of_val(&per_frame_data) as wgpu::BufferAddress,
-                    },
-                }],
-                label: Some("normal compute binding group"),
-            });
-
-        let normal_compute_bg1 = gpu_interfaces
-            .device
-            .create_bind_group(&wgpu::BindGroupDescriptor {
-                layout: &normal_compute_layout1.unwrap(),
-                bindings: &[
-                    wgpu::Binding {
-                        binding: 0,
-                        resource: wgpu::BindingResource::TextureView(&depth_texture.view),
-                    },
-                    wgpu::Binding {
-                        binding: 1,
-                        resource: wgpu::BindingResource::Sampler(&depth_texture.sampler),
-                    },
-                    wgpu::Binding{
-                        binding: 2,
-                        resource: wgpu::BindingResource::TextureView(&render_target.view),
-                    }
-                ],
-                label: Some("normal binding group 2"),
-            });
-        let normal_compute_bgs = vec![normal_compute_bg0, normal_compute_bg1];
+        let (normal_config, normal_config_buffer, normal_compute_bgs) =
+            Sandbox::create_normal_compue_bg(
+                &engine_runtime,
+                &gpu_interfaces,
+                &uniform_buffer,
+                &per_frame_data,
+                &depth_texture,
+                &render_target,
+                &normal_compute_layout_handle,
+            );
 
         let gltf_file = graphics::model::load_gltf_file(
             "resources/aoScene/aoScene.gltf",
@@ -329,6 +379,8 @@ impl platform::Application for Sandbox {
             size,
             camera_controller,
             per_frame_data,
+            normal_config,
+            normal_config_buffer,
             time_stamp: platform::core::get_time_in_micro(),
             delta_time: 0,
             gltf_file,
@@ -340,7 +392,39 @@ impl platform::Application for Sandbox {
 
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>) {
         self.engine_runtime.gpu_interfaces.resize(new_size);
+        self.normal_config.texture_size.x = new_size.width;
+        self.normal_config.texture_size.y = new_size.height;
         self.size = new_size;
+
+        let mut encoder = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_command_encoder(&wgpu::CommandEncoderDescriptor {
+                label: Some("resize encoder"),
+            });
+
+        let staging_buffer = self
+            .engine_runtime
+            .gpu_interfaces
+            .device
+            .create_buffer_with_data(
+                bytemuck::cast_slice(&[self.normal_config]),
+                wgpu::BufferUsage::COPY_SRC,
+            );
+
+        encoder.copy_buffer_to_buffer(
+            &staging_buffer,
+            0,
+            &self.normal_config_buffer,
+            0,
+            std::mem::size_of::<NormalReconstructionConfig>() as wgpu::BufferAddress,
+        );
+
+        self.engine_runtime
+            .gpu_interfaces
+            .queue
+            .submit(Some(encoder.finish()));
     }
 
     // input() won't deal with GPU code, so it can be synchronous
@@ -478,9 +562,17 @@ impl platform::Application for Sandbox {
             cpass.set_pipeline(&pipeline.unwrap());
             cpass.set_bind_group(0, &self.normal_compute_bgs.get(0).unwrap(), &[]);
             cpass.set_bind_group(1, &self.normal_compute_bgs.get(1).unwrap(), &[]);
-            let gx =  1024/8;
-            let gy =  768/8;
-            cpass.dispatch(gx as u32, gy, 1);
+            let w = self.size.width;
+            let h = self.size.height;
+            let gx = match (w % 8) == 0 {
+                true => w / 8,
+                false => w / 8 + 1,
+            };
+            let gy = match (h % 8) == 0 {
+                true => h / 8,
+                false => h / 8 + 1,
+            };
+            cpass.dispatch(gx, gy, 1);
         }
 
         //normal reconstruction

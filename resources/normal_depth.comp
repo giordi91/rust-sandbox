@@ -21,6 +21,10 @@ layout (set=0,binding=0) uniform InputData
 layout(set = 1, binding = 0) uniform texture2D  depth_texture;
 layout(set = 1, binding = 1) uniform sampler depth_sampler;
 layout(set = 1, binding = 2, rgba32f) uniform image2D output_tex;
+layout(set=1, binding=3)
+uniform Config{
+  uvec2 texture_size;
+};
 
 vec3 reconstructPosition(in vec2  uv, in float z, in mat4 InvVP)
 {
@@ -51,8 +55,8 @@ uvec2 unflatten2D(uint idx, uint width)
 }
 void main() {
 
-    int w = 1024;
-    int h = 768;
+    uint w = texture_size.x;
+    uint h = texture_size.y;
     vec2 whf = vec2(w,h);
 
     uvec2 idx = gl_GlobalInvocationID.xy;
