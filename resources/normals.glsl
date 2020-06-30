@@ -1,4 +1,4 @@
-
+//from http://jcgt.org/published/0003/02/01/paper.pdf
 vec2 OctWrap(vec2 v) {
   vec2 rhs = vec2(
     v.x > 0.0 ? 1.0 : -1.0,
