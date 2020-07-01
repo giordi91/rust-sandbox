@@ -20,6 +20,8 @@ use winit::{
 use async_trait::async_trait;
 
 use super::graphics::api;
+use super::graphics::ui;
+use std::time::Instant;
 
 use log;
 
@@ -42,7 +44,7 @@ pub trait Application: 'static + Sized {
     fn resize(&mut self, new_size: winit::dpi::PhysicalSize<u32>);
     fn input(&mut self, event: &WindowEvent) -> bool;
     fn update(&mut self,command_buffers: &mut Vec<wgpu::CommandBuffer>);
-    fn render(&mut self,command_buffers: Vec<wgpu::CommandBuffer>);
+    fn render(&mut self,command_buffers: Vec<wgpu::CommandBuffer>, window: &Window,imgui_interfaces: &mut ImguiInterfaces);
 }
 
 
@@ -57,13 +59,73 @@ impl EngineRuntime {
 }
 
 
+pub struct ImguiInterfaces {
+    pub imgui: imgui::Context,
+    pub imgui_platform: imgui_winit_support::WinitPlatform,
+    pub ui_renderer: ui::Renderer,
+    pub instant: Instant,
+    pub last_cursor: Option<imgui::MouseCursor>,
+}
+
+impl ImguiInterfaces {
+    fn new(engine_runtime: &mut EngineRuntime, window: &Window) -> Self {
+        //imgui
+        // Set up dear imgui
+        let hidpi_factor = 1.0;
+        let mut imgui = imgui::Context::create();
+        let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
+        imgui_platform.attach_window(
+            imgui.io_mut(),
+            &window,
+            imgui_winit_support::HiDpiMode::Default,
+        );
+        imgui.set_ini_filename(None);
+
+        let font_size = (13.0 * hidpi_factor) as f32;
+        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
+
+        imgui
+            .fonts()
+            .add_font(&[imgui::FontSource::DefaultFontData {
+                config: Some(imgui::FontConfig {
+                    oversample_h: 1,
+                    pixel_snap_h: true,
+                    size_pixels: font_size,
+                    ..Default::default()
+                }),
+            }]);
+
+        //
+        // Set up dear imgui wgpu renderer
+        //
+
+        let renderer = ui::Renderer::new(
+            &mut imgui,
+            &engine_runtime.gpu_interfaces.device,
+            &mut engine_runtime.gpu_interfaces.queue,
+            engine_runtime.gpu_interfaces.sc_desc.format,
+            None,
+        );
+
+        ImguiInterfaces {
+            imgui,
+            imgui_platform,
+            ui_renderer: renderer,
+            instant: Instant::now(),
+            last_cursor: None,
+        }
+    }
+}
+
+
 async fn run<T: Application>(
     event_loop: EventLoop<()>,
     window: Window,
     swapchain_format: wgpu::TextureFormat,
 ) {
     //instantiating the engine innerworking and move it to the application
-    let engine_runtime = EngineRuntime::new(&window, swapchain_format).await;
+    let mut engine_runtime = EngineRuntime::new(&window, swapchain_format).await;
+    let mut imgui_interfaces =ImguiInterfaces::new(&mut engine_runtime,&window);
 
     let mut app = T::new(&window, engine_runtime).await;
     event_loop.run(move |event, _, control_flow| {
@@ -100,7 +162,7 @@ async fn run<T: Application>(
             Event::RedrawRequested(_) => {
                 let mut buffers = Vec::new();
                 app.update(&mut buffers);
-                app.render(buffers);
+                app.render(buffers, &window,&mut imgui_interfaces);
 
             }
             Event::MainEventsCleared => {
@@ -110,6 +172,7 @@ async fn run<T: Application>(
             }
             _ => {}
         }
+        imgui_interfaces.imgui_platform.handle_event(imgui_interfaces.imgui.io_mut(), &window, &event);
     });
 }
 

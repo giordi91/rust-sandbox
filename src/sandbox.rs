@@ -5,6 +5,7 @@ use rust_sandbox::engine::graphics;
 use rust_sandbox::engine::graphics::ui;
 use rust_sandbox::engine::handle;
 use rust_sandbox::engine::platform;
+use rust_sandbox::engine::platform::ImguiInterfaces;
 
 use std::time::Instant;
 
@@ -28,6 +29,7 @@ unsafe impl bytemuck::Pod for ObjectBuffer {}
 unsafe impl bytemuck::Zeroable for ObjectBuffer {}
 unsafe impl bytemuck::Pod for NormalReconstructionConfig {}
 unsafe impl bytemuck::Zeroable for NormalReconstructionConfig {}
+
 
 pub struct Sandbox {
     engine_runtime: platform::EngineRuntime,
@@ -421,52 +423,6 @@ impl platform::Application for Sandbox {
                     });
             per_object_bind_groups.push(uniform_bind_group_2);
         }
-        //imgui
-        // Set up dear imgui
-        let hidpi_factor = 1.0;
-        let mut imgui = imgui::Context::create();
-        let mut imgui_platform = imgui_winit_support::WinitPlatform::init(&mut imgui);
-        imgui_platform.attach_window(
-            imgui.io_mut(),
-            &window,
-            imgui_winit_support::HiDpiMode::Default,
-        );
-        imgui.set_ini_filename(None);
-
-        let font_size = (13.0 * hidpi_factor) as f32;
-        imgui.io_mut().font_global_scale = (1.0 / hidpi_factor) as f32;
-
-        imgui
-            .fonts()
-            .add_font(&[imgui::FontSource::DefaultFontData {
-                config: Some(imgui::FontConfig {
-                    oversample_h: 1,
-                    pixel_snap_h: true,
-                    size_pixels: font_size,
-                    ..Default::default()
-                }),
-            }]);
-
-        //
-        // Set up dear imgui wgpu renderer
-        //
-        let clear_color = wgpu::Color {
-            r: 0.1,
-            g: 0.2,
-            b: 0.3,
-            a: 1.0,
-        };
-
-        let mut renderer = ui::Renderer::new(
-            &mut imgui,
-            &engine_runtime.gpu_interfaces.device,
-            &mut engine_runtime.gpu_interfaces.queue,
-            engine_runtime.gpu_interfaces.sc_desc.format,
-            Some(clear_color),
-        );
-
-        let mut last_frame = Instant::now();
-        let mut demo_open = true;
 
         //let mut last_cursor = None;
 
@@ -586,7 +542,7 @@ impl platform::Application for Sandbox {
         command_buffers.push(encoder.finish());
     }
 
-    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer>) {
+    fn render(&mut self, mut command_buffers: Vec<wgpu::CommandBuffer>, window: &Window, imgui_interfaces: &mut ImguiInterfaces) {
         let mut encoder = self
             .engine_runtime
             .gpu_interfaces
@@ -717,61 +673,62 @@ impl platform::Application for Sandbox {
 
         //imgui
         {
-            /*
-            imgui.io_mut().update_delta_time(self.delta_time);
+            let delta_s = imgui_interfaces.instant.elapsed();
+            imgui_interfaces.instant = 
+                imgui_interfaces
+                .imgui
+                .io_mut()
+                .update_delta_time(imgui_interfaces.instant);
 
-            let frame = match swap_chain.get_next_texture() {
-                Ok(frame) => frame,
-                Err(e) => {
-                    eprintln!("dropped frame: {:?}", e);
-                    return;
-                }
-            };
-            imgui_platform
-                .prepare_frame(imgui.io_mut(), &window)
+            imgui_interfaces
+                .imgui_platform
+                .prepare_frame(imgui_interfaces.imgui.io_mut(), &window)
                 .expect("Failed to prepare frame");
-            let ui = imgui.frame();
+            let ui = imgui_interfaces.imgui.frame();
 
             {
-                let window = imgui::Window::new(im_str!("Hello world"));
+                let window = imgui::Window::new(imgui::im_str!("Hello world"));
                 window
-                    .size([300.0, 100.0], Condition::FirstUseEver)
+                    .size([300.0, 100.0], imgui::Condition::FirstUseEver)
                     .build(&ui, || {
-                        ui.text(im_str!("Hello world!"));
-                        ui.text(im_str!("This...is...imgui-rs on WGPU!"));
+                        ui.text(imgui::im_str!("Hello world!"));
+                        ui.text(imgui::im_str!("This...is...imgui-rs on WGPU!"));
                         ui.separator();
                         let mouse_pos = ui.io().mouse_pos;
-                        ui.text(im_str!(
+                        ui.text(imgui::im_str!(
                             "Mouse Position: ({:.1},{:.1})",
                             mouse_pos[0],
                             mouse_pos[1]
                         ));
                     });
 
-                let window = imgui::Window::new(im_str!("Hello too"));
+                let window = imgui::Window::new(imgui::im_str!("Hello too"));
                 window
-                    .size([400.0, 200.0], Condition::FirstUseEver)
-                    .position([400.0, 200.0], Condition::FirstUseEver)
+                    .size([400.0, 200.0], imgui::Condition::FirstUseEver)
+                    .position([400.0, 200.0], imgui::Condition::FirstUseEver)
                     .build(&ui, || {
-                        ui.text(im_str!("Frametime: {:?}", delta_s));
+                        ui.text(imgui::im_str!("Frametime: {:?}", delta_s));
                     });
 
+                let mut demo_open = true;
                 ui.show_demo_window(&mut demo_open);
             }
 
-            let mut encoder: wgpu::CommandEncoder =
-                device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: None });
-
-            if last_cursor != Some(ui.mouse_cursor()) {
-                last_cursor = Some(ui.mouse_cursor());
-                platform.prepare_render(&ui, &window);
+            if imgui_interfaces.last_cursor != ui.mouse_cursor() {
+                imgui_interfaces.last_cursor = ui.mouse_cursor();
+                imgui_interfaces
+                    .imgui_platform
+                    .prepare_render(&ui, &window);
             }
-            renderer
-                .render(ui.render(), &mut device, &mut encoder, &frame.view)
+            imgui_interfaces
+                .ui_renderer
+                .render(
+                    ui.render(),
+                    &mut self.engine_runtime.gpu_interfaces.device,
+                    &mut encoder,
+                    &frame.view,
+                )
                 .expect("Rendering failed");
-
-            queue.submit(&[encoder.finish()]);
-            */
         }
 
         command_buffers.push(encoder.finish());
